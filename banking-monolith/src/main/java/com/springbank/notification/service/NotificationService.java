@@ -21,6 +21,10 @@ public class NotificationService {
         return notificationRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
+    public List<Notification> getAll() {
+        return notificationRepository.findAll();
+    }
+
     public Notification getById(Long id) {
         return notificationRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Notification not found: " + id));

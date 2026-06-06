@@ -72,4 +72,11 @@ public class AnalyticsService {
                 .map(spendingSnapshotMapper::toDto)
                 .orElseThrow(() -> new RuntimeException("Snapshot not found"));
     }
+
+    @Transactional(readOnly = true)
+    public List<SpendingSnapshotDto> getAllSnapshots() {
+        return spendingSnapshotRepository.findAll().stream()
+                .map(spendingSnapshotMapper::toDto)
+                .collect(Collectors.toList());
+    }
 }

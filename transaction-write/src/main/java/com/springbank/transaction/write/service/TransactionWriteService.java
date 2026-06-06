@@ -29,7 +29,7 @@ public class TransactionWriteService {
     private final TransactionRepository transactionRepository;
     private final TransactionMapper transactionMapper;
     private final TransactionEventPublisher eventPublisher;
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final RestTemplate restTemplate;
 
     @Value("${services.monolith.url:http://localhost:8081}")
     private String monolithBaseUrl;
@@ -60,8 +60,26 @@ public class TransactionWriteService {
     public TransactionResponseDto completeTransaction(Long id) {
         Transaction tx = transactionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction", id));
+
+        if (tx.getStatus() != TransactionStatus.PENDING) {
+            throw new IllegalStateException("Transaction must be in PENDING status to complete. Current status: " + tx.getStatus());
+        }
+
+        // Update balances in monolith for transfer/withdrawal
+        if (tx.getFromAccountId() != null && (tx.getType() == TransactionType.TRANSFER || tx.getType() == TransactionType.WITHDRAWAL || tx.getType() == TransactionType.CARD_PAYMENT)) {
+            callWithdraw(tx.getFromAccountId(), tx.getAmount());
+        }
+        if (tx.getToAccountId() != null && tx.getType() == TransactionType.TRANSFER) {
+            callDeposit(tx.getToAccountId(), tx.getAmount());
+        }
+        if (tx.getType() == TransactionType.DEPOSIT && tx.getToAccountId() != null) {
+            callDeposit(tx.getToAccountId(), tx.getAmount());
+        }
+
         tx.setStatus(TransactionStatus.COMPLETED);
         Transaction saved = transactionRepository.save(tx);
+        eventPublisher.publishTransactionCompleted(saved);
+        log.info("Transaction completed and balances updated: {}", id);
         return transactionMapper.toDto(saved);
     }
 
@@ -76,8 +94,48 @@ public class TransactionWriteService {
     public TransactionResponseDto reverseTransaction(Long id) {
         Transaction tx = transactionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Transaction", id));
+
+        if (tx.getStatus() != TransactionStatus.COMPLETED) {
+            throw new IllegalStateException("Only completed transactions can be reversed. Current status: " + tx.getStatus());
+        }
+
+        // Reverse balances in monolith
+        if (tx.getFromAccountId() != null && (tx.getType() == TransactionType.TRANSFER || tx.getType() == TransactionType.WITHDRAWAL || tx.getType() == TransactionType.CARD_PAYMENT)) {
+            callDeposit(tx.getFromAccountId(), tx.getAmount());
+        }
+        if (tx.getToAccountId() != null && tx.getType() == TransactionType.TRANSFER) {
+            callWithdraw(tx.getToAccountId(), tx.getAmount());
+        }
+        if (tx.getType() == TransactionType.DEPOSIT && tx.getToAccountId() != null) {
+            callWithdraw(tx.getToAccountId(), tx.getAmount());
+        }
+
         tx.setStatus(TransactionStatus.REVERSED);
-        return transactionMapper.toDto(transactionRepository.save(tx));
+        Transaction saved = transactionRepository.save(tx);
+        log.info("Transaction reversed and balances restored: {}", id);
+        return transactionMapper.toDto(saved);
+    }
+
+    private void callDeposit(Long accountId, BigDecimal amount) {
+        try {
+            restTemplate.postForEntity(
+                    monolithBaseUrl + "/internal/accounts/" + accountId + "/deposit?amount=" + amount,
+                    null, String.class);
+        } catch (Exception e) {
+            log.error("Failed to deposit to account {}: {}", accountId, e.getMessage());
+            throw new IllegalStateException("Failed to update account balance during deposit");
+        }
+    }
+
+    private void callWithdraw(Long accountId, BigDecimal amount) {
+        try {
+            restTemplate.postForEntity(
+                    monolithBaseUrl + "/internal/accounts/" + accountId + "/withdraw?amount=" + amount,
+                    null, String.class);
+        } catch (Exception e) {
+            log.error("Failed to withdraw from account {}: {}", accountId, e.getMessage());
+            throw new IllegalStateException("Failed to update account balance during withdraw");
+        }
     }
 
     public TransactionResponseDto getById(Long id) {

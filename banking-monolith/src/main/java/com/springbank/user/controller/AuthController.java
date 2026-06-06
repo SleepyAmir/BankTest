@@ -6,6 +6,7 @@ import com.springbank.user.dto.RefreshTokenRequestDto;
 import com.springbank.user.dto.TokenResponseDto;
 import com.springbank.user.dto.UserRegistrationDto;
 import com.springbank.user.dto.UserResponseDto;
+import com.springbank.user.security.CustomUserDetailsService;
 import com.springbank.user.security.JwtTokenProvider;
 import com.springbank.user.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -23,6 +25,7 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserService userService;
+    private final CustomUserDetailsService customUserDetailsService;
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<TokenResponseDto>> login(@RequestBody LoginRequestDto request) {
@@ -47,9 +50,13 @@ public class AuthController {
             throw new IllegalArgumentException("Invalid refresh token");
         }
         String username = jwtTokenProvider.getUsernameFromToken(request.refreshToken());
-        // Generate new tokens (simplified - in production load user and create auth object)
+        UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
+        UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
+                userDetails, null, userDetails.getAuthorities());
+        String newAccessToken = jwtTokenProvider.generateAccessToken(auth);
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken(auth);
         return ResponseEntity.ok(ApiResponse.success("Token refreshed",
-                new TokenResponseDto("new-access-token", request.refreshToken(), "Bearer", 3600),
+                new TokenResponseDto(newAccessToken, newRefreshToken, "Bearer", 3600),
                 "/api/auth/refresh"));
     }
 }
