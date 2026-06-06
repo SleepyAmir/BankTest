@@ -8,14 +8,14 @@ spring:
   application:
     name: audit-service
   datasource:
-    url: jdbc:postgresql://localhost:5436/banking_audit_db
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5436}/${DB_NAME:banking_audit_db}
     username: ${DB_USER:postgres}
     password: ${DB_PASS:postgres}
   jpa:
     hibernate:
       ddl-auto: update
   rabbitmq:
-    host: localhost
+    host: ${RABBITMQ_HOST:localhost}
     port: 5672
     username: guest
     password: guest
