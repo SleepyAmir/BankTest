@@ -1,5 +1,6 @@
 package com.springbank.user.repository;
 
+import com.springbank.common.repository.BaseEntityRepository;
 import com.springbank.user.entity.Role;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

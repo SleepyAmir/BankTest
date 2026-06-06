@@ -19,3 +19,7 @@ spring:
     port: 5672
     username: guest
     password: guest
+
+services:
+  monolith:
+    url: http://localhost:8081

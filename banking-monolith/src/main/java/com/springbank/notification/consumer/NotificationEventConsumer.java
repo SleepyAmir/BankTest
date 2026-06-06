@@ -23,29 +23,27 @@ public class NotificationEventConsumer {
     private final UserRepository userRepository;
 
     @RabbitListener(queues = "notification.queue")
-    public void handleTransactionCompleted(TransactionCompletedEvent event) {
-        log.info("Notification: Transaction completed for user: {}", event.getUserId());
-        if (event.getUserId() != null) {
-            createNotification(event.getUserId(), NotificationType.TRANSACTION_DONE,
-                    "Transaction Completed",
-                    "Your transaction of " + event.getAmount() + " " + event.getType() + " has been completed.");
+    public void handleEvent(Object eventObject) {
+        if (eventObject instanceof TransactionCompletedEvent event) {
+            log.info("Notification: Transaction completed for user: {}", event.getUserId());
+            if (event.getUserId() != null) {
+                createNotification(event.getUserId(), NotificationType.TRANSACTION_DONE,
+                        "Transaction Completed",
+                        "Your transaction of " + event.getAmount() + " " + event.getType() + " has been completed.");
+            }
+        } else if (eventObject instanceof LoanApprovedEvent event) {
+            log.info("Notification: Loan approved for user: {}", event.getUserId());
+            createNotification(event.getUserId(), NotificationType.LOAN_APPROVED,
+                    "Loan Approved",
+                    "Your loan application for " + event.getAmount() + " has been approved.");
+        } else if (eventObject instanceof FraudDetectedEvent event) {
+            log.info("Notification: Fraud detected for user: {}", event.getUserId());
+            createNotification(event.getUserId(), NotificationType.FRAUD_ALERT,
+                    "Fraud Alert",
+                    "A suspicious transaction has been detected on your account. Risk level: " + event.getRiskLevel());
+        } else {
+            log.warn("Unknown notification event type: {}", eventObject.getClass().getName());
         }
-    }
-
-    @RabbitListener(queues = "notification.queue")
-    public void handleLoanApproved(LoanApprovedEvent event) {
-        log.info("Notification: Loan approved for user: {}", event.getUserId());
-        createNotification(event.getUserId(), NotificationType.LOAN_APPROVED,
-                "Loan Approved",
-                "Your loan application for " + event.getAmount() + " has been approved.");
-    }
-
-    @RabbitListener(queues = "notification.queue")
-    public void handleFraudDetected(FraudDetectedEvent event) {
-        log.info("Notification: Fraud detected for user: {}", event.getUserId());
-        createNotification(event.getUserId(), NotificationType.FRAUD_ALERT,
-                "Fraud Alert",
-                "A suspicious transaction has been detected on your account. Risk level: " + event.getRiskLevel());
     }
 
     private void createNotification(Long userId, NotificationType type, String title, String message) {

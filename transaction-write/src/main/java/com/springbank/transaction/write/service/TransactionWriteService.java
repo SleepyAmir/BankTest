@@ -12,6 +12,7 @@ import com.springbank.transaction.write.messaging.TransactionEventPublisher;
 import com.springbank.transaction.write.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
@@ -30,7 +31,8 @@ public class TransactionWriteService {
     private final TransactionEventPublisher eventPublisher;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    private static final String MONOLITH_BASE_URL = "http://localhost:8081";
+    @Value("${services.monolith.url:http://localhost:8081}")
+    private String monolithBaseUrl;
 
     public TransactionResponseDto createTransaction(TransactionCreateDto dto) {
         // Balance check for transfer/withdrawal
@@ -87,7 +89,7 @@ public class TransactionWriteService {
     private BigDecimal checkBalance(Long accountId) {
         try {
             var response = restTemplate.getForObject(
-                    MONOLITH_BASE_URL + "/internal/accounts/" + accountId + "/balance",
+                    monolithBaseUrl + "/internal/accounts/" + accountId + "/balance",
                     java.util.Map.class);
             if (response != null && response.get("balance") != null) {
                 return new BigDecimal(response.get("balance").toString());

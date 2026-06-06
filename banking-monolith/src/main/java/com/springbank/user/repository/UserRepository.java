@@ -1,5 +1,6 @@
 package com.springbank.user.repository;
 
+import com.springbank.common.repository.BaseEntityRepository;
 import com.springbank.user.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
