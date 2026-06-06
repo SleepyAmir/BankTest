@@ -1,0 +1,25 @@
+server:
+  port: 8087
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: transaction-read
+  datasource:
+    url: jdbc:postgresql://localhost:5433/banking_transaction_db
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest

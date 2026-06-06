@@ -6,6 +6,7 @@ import com.springbank.common.enums.AmlAlertType;
 import com.springbank.common.enums.FraudRiskLevel;
 import com.springbank.common.event.TransactionCompletedEvent;
 import com.springbank.fraud.dto.FraudAlertDto;
+import com.springbank.fraud.dto.AmlAlertDto;
 import com.springbank.fraud.entity.AmlAlert;
 import com.springbank.fraud.entity.FraudAlert;
 import com.springbank.fraud.mapper.FraudAlertMapper;
@@ -23,6 +24,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * ============================================================================
+ * FRAUD ANALYSIS SERVICE
+ * ============================================================================
+ * Triggered by: RabbitMQ event from transaction-write (transaction.* routing)
+ * Rules: Large TX (>50M), Unknown Device, (Time-based checks in future)
+ * Output: FraudAlert (scored), AMLAlert (if risk >= 60)
+ *
+ * LOG MARKERS: [FRAUD-ANALYZE] [FRAUD-RULE] [FRAUD-SAVE] [FRAUD-AML] [FRAUD-QUERY]
+ * ============================================================================
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -35,28 +47,41 @@ public class FraudAnalysisService {
 
     @Transactional
     public void analyzeTransaction(TransactionCompletedEvent event) {
-        log.info("Analyzing transaction {} for fraud", event.getTransactionId());
+        log.info("[FRAUD-ANALYZE] ==================== NEW FRAUD ANALYSIS ====================");
+        log.info("[FRAUD-ANALYZE] TransactionId={}, TrackingCode={}, Amount={}, UserId={}",
+                event.getTransactionId(), event.getTrackingCode(), event.getAmount(), event.getUserId());
 
         List<String> triggeredRules = new ArrayList<>();
         BigDecimal riskScore = BigDecimal.ZERO;
 
-        // Rule 1: Large transaction (>50M)
+        // ====== RULE 1: Large transaction (>50,000,000) ======
+        log.info("[FRAUD-RULE] Checking RULE-1: Large transaction (threshold=50,000,000)");
         if (event.getAmount().compareTo(new BigDecimal("50000000")) > 0) {
             triggeredRules.add("LARGE_TRANSACTION");
             riskScore = riskScore.add(new BigDecimal("30"));
+            log.info("[FRAUD-RULE] ✅ RULE-1 TRIGGERED: amount={} > 50M. Risk +30. Total={}",
+                    event.getAmount(), riskScore);
+        } else {
+            log.info("[FRAUD-RULE] ❌ RULE-1 not triggered (amount={} <= 50M)", event.getAmount());
         }
 
-        // Rule 2: Unusual time (simplified - always pass for demo)
-        // In real implementation: check if transaction hour is unusual for user
+        // ====== RULE 2: Unusual time (placeholder for demo) ======
+        log.info("[FRAUD-RULE] Checking RULE-2: Unusual time (simplified — always pass for demo)");
 
-        // Rule 3: New device (if no device fingerprint match)
+        // ====== RULE 3: Unknown device (no fingerprint) ======
+        log.info("[FRAUD-RULE] Checking RULE-3: Device fingerprint");
         if (event.getDeviceFingerprint() == null || event.getDeviceFingerprint().isBlank()) {
             triggeredRules.add("UNKNOWN_DEVICE");
             riskScore = riskScore.add(new BigDecimal("20"));
+            log.info("[FRAUD-RULE] ✅ RULE-3 TRIGGERED: Device fingerprint is empty. Risk +20. Total={}", riskScore);
+        } else {
+            log.info("[FRAUD-RULE] ❌ RULE-3 not triggered (deviceFingerprint={})", event.getDeviceFingerprint());
         }
 
         FraudRiskLevel level = determineRiskLevel(riskScore);
+        log.info("[FRAUD-ANALYZE] Final Risk Score={}, Level={}", riskScore, level);
 
+        // ====== Save FraudAlert ======
         FraudAlert alert = FraudAlert.builder()
                 .riskScore(riskScore)
                 .riskLevel(level)
@@ -69,11 +94,18 @@ public class FraudAnalysisService {
                 .build();
 
         fraudAlertRepository.save(alert);
+        log.info("[FRAUD-SAVE] ✅ FraudAlert saved: id={}, transactionId={}, riskLevel={}",
+                alert.getId(), alert.getTransactionId(), alert.getRiskLevel());
 
-        // Check for AML alerts
+        // ====== Check for AML alert (high risk) ======
         if (riskScore.compareTo(new BigDecimal("60")) >= 0) {
+            log.info("[FRAUD-AML] Risk score {} >= 60 threshold → Creating AML alert", riskScore);
             createAmlAlert(event, triggeredRules, riskScore);
+        } else {
+            log.info("[FRAUD-AML] Risk score {} < 60 → No AML alert needed", riskScore);
         }
+
+        log.info("[FRAUD-ANALYZE] ==================== ANALYSIS COMPLETE ====================\n");
     }
 
     private FraudRiskLevel determineRiskLevel(BigDecimal score) {
@@ -87,6 +119,8 @@ public class FraudAnalysisService {
         AmlAlertType type = rules.contains("LARGE_TRANSACTION") ? AmlAlertType.LARGE_TRANSACTION : AmlAlertType.UNUSUAL_PATTERN;
         AlertSeverity severity = score.compareTo(new BigDecimal("80")) >= 0 ? AlertSeverity.CRITICAL : AlertSeverity.HIGH;
 
+        log.info("[FRAUD-AML] Creating AML alert: type={}, severity={}, score={}", type, severity, score);
+
         AmlAlert aml = AmlAlert.builder()
                 .type(type)
                 .severity(severity)
@@ -98,37 +132,54 @@ public class FraudAnalysisService {
                 .build();
 
         amlAlertRepository.save(aml);
+        log.info("[FRAUD-AML] ✅ AML alert saved: id={}, type={}, severity={}, transactionId={}",
+                aml.getId(), aml.getType(), aml.getSeverity(), aml.getTransactionId());
     }
 
     @Transactional(readOnly = true)
     public List<FraudAlertDto> getFraudAlertsByUser(Long userId) {
-        return fraudAlertRepository.findByUserId(userId).stream()
+        log.info("[FRAUD-QUERY] Querying fraud alerts for userId={}", userId);
+        List<FraudAlertDto> result = fraudAlertRepository.findByUserId(userId).stream()
                 .map(fraudAlertMapper::toDto)
                 .collect(Collectors.toList());
+        log.info("[FRAUD-QUERY] Found {} fraud alerts for userId={}", result.size(), userId);
+        return result;
     }
 
     @Transactional(readOnly = true)
     public List<FraudAlertDto> getAllFraudAlerts() {
-        return fraudAlertRepository.findAll().stream()
+        log.info("[FRAUD-QUERY] Querying all fraud alerts");
+        List<FraudAlertDto> result = fraudAlertRepository.findAll().stream()
                 .map(fraudAlertMapper::toDto)
                 .collect(Collectors.toList());
+        log.info("[FRAUD-QUERY] Found {} total fraud alerts", result.size());
+        return result;
     }
 
     @Transactional(readOnly = true)
     public List<AmlAlertDto> getAmlAlertsByUser(Long userId) {
-        return amlAlertRepository.findByUserId(userId).stream()
+        log.info("[FRAUD-QUERY] Querying AML alerts for userId={}", userId);
+        List<AmlAlertDto> result = amlAlertRepository.findByUserId(userId).stream()
                 .map(amlAlertMapper::toDto)
                 .collect(Collectors.toList());
+        log.info("[FRAUD-QUERY] Found {} AML alerts for userId={}", result.size(), userId);
+        return result;
     }
 
     @Transactional
     public FraudAlertDto reviewFraudAlert(Long id, String reviewedBy, String note, boolean userConfirmed) {
+        log.info("[FRAUD-REVIEW] Reviewing fraud alert id={} by {}. Confirmed={}", id, reviewedBy, userConfirmed);
         FraudAlert alert = fraudAlertRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Fraud alert not found: " + id));
+                .orElseThrow(() -> {
+                    log.error("[FRAUD-REVIEW] ❌ Fraud alert not found: id={}", id);
+                    return new RuntimeException("Fraud alert not found: " + id);
+                });
         alert.setReviewedBy(reviewedBy);
         alert.setReviewNote(note);
         alert.setUserConfirmed(userConfirmed);
         alert.setResolvedAt(LocalDateTime.now());
-        return fraudAlertMapper.toDto(fraudAlertRepository.save(alert));
+        FraudAlert saved = fraudAlertRepository.save(alert);
+        log.info("[FRAUD-REVIEW] ✅ Fraud alert id={} reviewed. ResolvedAt={}", saved.getId(), saved.getResolvedAt());
+        return fraudAlertMapper.toDto(saved);
     }
 }

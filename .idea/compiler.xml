@@ -13,6 +13,7 @@
         <module name="fraud-service" />
         <module name="transaction-read" />
         <module name="audit-service" />
+        <module name="analytics-service" />
         <module name="api-gateway" />
         <module name="shared-kernel" />
         <module name="banking-monolith" />

@@ -1,0 +1,21 @@
+server:
+  port: 8093
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: analytics-service
+  datasource:
+    url: jdbc:postgresql://localhost:5435/banking_analytics_db
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest

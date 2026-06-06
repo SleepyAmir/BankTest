@@ -12,7 +12,7 @@
 
     <artifactId>analytics-service</artifactId>
     <name>Analytics Service</name>
-    <description>Heavy Compute & Spending Snapshots — Spring Boot + RabbitMQ + @Scheduled (port 8093)</description>
+    <description>Heavy Compute and Spending Snapshots — Spring Boot + RabbitMQ + @Scheduled (port 8093)</description>
 
     <properties>
         <java.version>21</java.version>

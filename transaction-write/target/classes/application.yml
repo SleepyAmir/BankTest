@@ -1,0 +1,25 @@
+server:
+  port: 8088
+
+spring:
+  threads:
+    virtual:
+      enabled: true
+  application:
+    name: transaction-write
+  datasource:
+    url: jdbc:postgresql://localhost:5433/banking_transaction_db
+    username: ${DB_USER:postgres}
+    password: ${DB_PASS:postgres}
+  jpa:
+    hibernate:
+      ddl-auto: update
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
+services:
+  monolith:
+    url: http://localhost:8081

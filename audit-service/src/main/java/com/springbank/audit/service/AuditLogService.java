@@ -14,6 +14,16 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * ============================================================================
+ * AUDIT LOG SERVICE — Compliance & Audit Trail
+ * ============================================================================
+ * Triggered by: RabbitMQ event from Monolith @Auditable AOP aspect
+ * Action: Persists immutable audit record for every business action
+ *
+ * LOG MARKERS: [AUDIT-SAVE] [AUDIT-QUERY]
+ * ============================================================================
+ */
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -24,54 +34,79 @@ public class AuditLogService {
 
     @Transactional
     public void saveAuditEvent(AuditLogEvent event) {
-        AuditLog logEntry = AuditLog.builder()
-                .actorUsername(event.getActorUsername())
-                .action(event.getAction())
-                .entityType(event.getEntityType())
-                .entityId(event.getEntityId())
-                .oldValue(event.getOldValue())
-                .newValue(event.getNewValue())
-                .ipAddress(event.getIpAddress())
-                .timestamp(event.getTimestamp() != null ? event.getTimestamp() : LocalDateTime.now())
-                .reason(event.getReason())
-                .build();
+        log.info("[AUDIT-SAVE] Persisting audit: action={}, entity={}, entityId={}, actor={}",
+                event.getAction(), event.getEntityType(), event.getEntityId(), event.getActorUsername());
 
-        auditLogRepository.save(logEntry);
-        log.debug("Audit log saved: {} on {} id={}", event.getAction(), event.getEntityType(), event.getEntityId());
+        try {
+            AuditLog logEntry = AuditLog.builder()
+                    .actorUsername(event.getActorUsername())
+                    .action(event.getAction())
+                    .entityType(event.getEntityType())
+                    .entityId(event.getEntityId())
+                    .oldValue(event.getOldValue())
+                    .newValue(event.getNewValue())
+                    .ipAddress(event.getIpAddress())
+                    .timestamp(event.getTimestamp() != null ? event.getTimestamp() : LocalDateTime.now())
+                    .reason(event.getReason())
+                    .build();
+
+            AuditLog saved = auditLogRepository.save(logEntry);
+            log.info("[AUDIT-SAVE] ✅ Audit log saved: id={}, action={}, entity={}, actor={}",
+                    saved.getId(), saved.getAction(), saved.getEntityType(), saved.getActorUsername());
+        } catch (Exception e) {
+            log.error("[AUDIT-SAVE] ❌ FAILED to save audit log: {}", e.getMessage());
+            log.error("[AUDIT-SAVE] ⚠️ Audit trail broken! Check audit DB (port 5436) and table structure.");
+            throw e;
+        }
     }
 
     @Transactional(readOnly = true)
     public List<AuditLogDto> getByActor(String actorUsername) {
-        return auditLogRepository.findByActorUsernameOrderByTimestampDesc(actorUsername).stream()
+        log.info("[AUDIT-QUERY] Querying audit logs by actor: {}", actorUsername);
+        List<AuditLogDto> result = auditLogRepository.findByActorUsernameOrderByTimestampDesc(actorUsername).stream()
                 .map(auditLogMapper::toDto)
                 .collect(Collectors.toList());
+        log.info("[AUDIT-QUERY] Found {} audit logs for actor={}", result.size(), actorUsername);
+        return result;
     }
 
     @Transactional(readOnly = true)
     public List<AuditLogDto> getByEntity(String entityType, Long entityId) {
-        return auditLogRepository.findByEntityTypeAndEntityId(entityType, entityId).stream()
+        log.info("[AUDIT-QUERY] Querying audit logs: entity={} id={}", entityType, entityId);
+        List<AuditLogDto> result = auditLogRepository.findByEntityTypeAndEntityId(entityType, entityId).stream()
                 .map(auditLogMapper::toDto)
                 .collect(Collectors.toList());
+        log.info("[AUDIT-QUERY] Found {} audit logs for {} id={}", result.size(), entityType, entityId);
+        return result;
     }
 
     @Transactional(readOnly = true)
     public List<AuditLogDto> getByAction(String action) {
-        return auditLogRepository.findByAction(action).stream()
+        log.info("[AUDIT-QUERY] Querying audit logs by action: {}", action);
+        List<AuditLogDto> result = auditLogRepository.findByAction(action).stream()
                 .map(auditLogMapper::toDto)
                 .collect(Collectors.toList());
+        log.info("[AUDIT-QUERY] Found {} audit logs for action={}", result.size(), action);
+        return result;
     }
 
     @Transactional(readOnly = true)
     public List<AuditLogDto> getByDateRange(LocalDateTime start, LocalDateTime end) {
-        return auditLogRepository.findByTimestampBetween(start, end).stream()
+        log.info("[AUDIT-QUERY] Querying audit logs from {} to {}", start, end);
+        List<AuditLogDto> result = auditLogRepository.findByTimestampBetween(start, end).stream()
                 .map(auditLogMapper::toDto)
                 .collect(Collectors.toList());
+        log.info("[AUDIT-QUERY] Found {} audit logs in date range", result.size());
+        return result;
     }
 
     @Transactional(readOnly = true)
     public List<AuditLogDto> getAll() {
-        return auditLogRepository.findAll().stream()
+        log.info("[AUDIT-QUERY] Querying all audit logs");
+        List<AuditLogDto> result = auditLogRepository.findAll().stream()
                 .map(auditLogMapper::toDto)
                 .collect(Collectors.toList());
+        log.info("[AUDIT-QUERY] Found {} total audit logs", result.size());
+        return result;
     }
 }
