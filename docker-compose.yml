@@ -1,0 +1,215 @@
+version: '3.8'
+
+services:
+  # PostgreSQL databases
+  postgres-monolith:
+    image: postgres:16-alpine
+    container_name: banking-monolith-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: banking_monolith_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - monolith_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-transaction:
+    image: postgres:16-alpine
+    container_name: banking-transaction-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: banking_transaction_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - transaction_data:/var/lib/postgresql/data
+
+  postgres-fraud:
+    image: postgres:16-alpine
+    container_name: banking-fraud-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: banking_fraud_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - fraud_data:/var/lib/postgresql/data
+
+  postgres-analytics:
+    image: postgres:16-alpine
+    container_name: banking-analytics-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: banking_analytics_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - analytics_data:/var/lib/postgresql/data
+
+  postgres-audit:
+    image: postgres:16-alpine
+    container_name: banking-audit-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: banking_audit_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - audit_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: banking-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: banking-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  # Services
+  banking-monolith:
+    build: ./banking-monolith
+    container_name: banking-monolith
+    ports:
+      - "8081:8081"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_HOST=postgres-monolith
+      - DB_PORT=5432
+      - DB_NAME=banking_monolith_db
+      - DB_USER=postgres
+      - DB_PASS=postgres
+      - REDIS_HOST=redis
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - postgres-monolith
+      - redis
+      - rabbitmq
+
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - banking-monolith
+      - transaction-read
+      - transaction-write
+      - redis
+
+  transaction-read:
+    build: ./transaction-read
+    container_name: transaction-read
+    ports:
+      - "8087:8087"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_HOST=postgres-transaction
+      - DB_PORT=5432
+      - DB_NAME=banking_transaction_db
+      - DB_USER=postgres
+      - DB_PASS=postgres
+      - REDIS_HOST=redis
+    depends_on:
+      - postgres-transaction
+      - redis
+
+  transaction-write:
+    build: ./transaction-write
+    container_name: transaction-write
+    ports:
+      - "8088:8088"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_HOST=postgres-transaction
+      - DB_PORT=5432
+      - DB_NAME=banking_transaction_db
+      - DB_USER=postgres
+      - DB_PASS=postgres
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - postgres-transaction
+      - rabbitmq
+
+  fraud-service:
+    build: ./fraud-service
+    container_name: fraud-service
+    ports:
+      - "8091:8091"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_HOST=postgres-fraud
+      - DB_PORT=5432
+      - DB_NAME=banking_fraud_db
+      - DB_USER=postgres
+      - DB_PASS=postgres
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - postgres-fraud
+      - rabbitmq
+
+  analytics-service:
+    build: ./analytics-service
+    container_name: analytics-service
+    ports:
+      - "8093:8093"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_HOST=postgres-analytics
+      - DB_PORT=5432
+      - DB_NAME=banking_analytics_db
+      - DB_USER=postgres
+      - DB_PASS=postgres
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - postgres-analytics
+      - rabbitmq
+
+  audit-service:
+    build: ./audit-service
+    container_name: audit-service
+    ports:
+      - "8092:8092"
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - DB_HOST=postgres-audit
+      - DB_PORT=5432
+      - DB_NAME=banking_audit_db
+      - DB_USER=postgres
+      - DB_PASS=postgres
+      - RABBITMQ_HOST=rabbitmq
+    depends_on:
+      - postgres-audit
+      - rabbitmq
+
+volumes:
+  monolith_data:
+  transaction_data:
+  fraud_data:
+  analytics_data:
+  audit_data:
+  redis_data:
+  rabbitmq_data:

@@ -1,0 +1,6 @@
+package com.springbank.common.enums;
+
+public enum NotificationType {
+    LOAN_APPROVED, LOAN_REJECTED, TRANSACTION_DONE, LOW_BALANCE,
+    CARD_EXPIRING, INSTALLMENT_DUE, INSTALLMENT_OVERDUE, FRAUD_ALERT
+}
