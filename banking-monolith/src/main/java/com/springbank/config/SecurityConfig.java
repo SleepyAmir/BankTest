@@ -10,7 +10,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.lang.Nullable;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authorization.AuthorizationDecision;
+import org.springframework.security.authorization.AuthorizationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -18,9 +21,11 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.RequestAuthorizationContext;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
 import org.springframework.security.web.header.writers.XXssProtectionHeaderWriter;
@@ -30,6 +35,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * پیکربندی امنیت مدرن Spring Boot 4.0.5
@@ -209,6 +215,16 @@ public class SecurityConfig {
                         .requestMatchers("/internal/**")
                         .access(new org.springframework.security.authorization.AuthorizationManager<org.springframework.security.web.access.intercept.RequestAuthorizationContext>() {
                             @Override
+                            public void verify(Supplier<Authentication> authentication, RequestAuthorizationContext object) {
+                                AuthorizationManager.super.verify(authentication, object);
+                            }
+
+                            @Nullable
+                            @Override
+                            public AuthorizationDecision check(Supplier<Authentication> authentication, RequestAuthorizationContext object) {
+                                return null;
+                            }
+
                             public org.springframework.security.authorization.AuthorizationDecision check(org.springframework.security.core.Authentication authentication, org.springframework.security.web.access.intercept.RequestAuthorizationContext context) {
                                 String remoteAddr = context.getRequest().getRemoteAddr();
                                 boolean allowed = "127.0.0.1".equals(remoteAddr) || "0:0:0:0:0:0:0:1".equals(remoteAddr) || "::1".equals(remoteAddr);

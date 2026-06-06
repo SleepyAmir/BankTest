@@ -1,5 +1,6 @@
 package com.springbank.user.service;
 
+import com.springbank.common.service.BaseEntityService;
 import com.springbank.user.dto.*;
 import com.springbank.user.mapper.UserMapper;
 import com.springbank.user.entity.Role;

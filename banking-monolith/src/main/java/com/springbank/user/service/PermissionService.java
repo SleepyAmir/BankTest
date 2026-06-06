@@ -1,5 +1,6 @@
 package com.springbank.user.service;
 
+import com.springbank.common.service.BaseEntityService;
 import com.springbank.user.dto.PermissionCreateDto;
 import com.springbank.user.dto.PermissionResponseDto;
 import com.springbank.user.dto.PermissionUpdateDto;

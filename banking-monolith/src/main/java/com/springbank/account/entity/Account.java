@@ -1,8 +1,10 @@
 package com.springbank.account.entity;
 
+import com.springbank.card.entity.Card;
 import com.springbank.common.entity.BaseEntity;
 import com.springbank.common.enums.AccountStatus;
 import com.springbank.common.enums.AccountType;
+import com.springbank.loan.entity.Loan;
 import com.springbank.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;

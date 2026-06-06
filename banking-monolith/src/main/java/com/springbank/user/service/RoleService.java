@@ -1,5 +1,6 @@
 package com.springbank.user.service;
 
+import com.springbank.common.service.BaseEntityService;
 import com.springbank.user.dto.RoleCreateDto;
 import com.springbank.user.dto.RoleResponseDto;
 import com.springbank.user.dto.RoleUpdateDto;
