@@ -1,6 +1,11 @@
 package com.springbank.config;
 
 import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.rabbit.listener.SimpleRabbitListenerContainerFactory;
+import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
+import org.springframework.amqp.support.converter.DefaultClassMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -35,6 +40,11 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue transactionReadQueue() {
+        return QueueBuilder.durable("transaction.read.queue").build();
+    }
+
+    @Bean
     public Binding auditBinding(Queue auditQueue, TopicExchange bankingExchange) {
         return BindingBuilder.bind(auditQueue).to(bankingExchange).with("audit.*");
     }
@@ -52,5 +62,44 @@ public class RabbitMQConfig {
     @Bean
     public Binding analyticsBinding(Queue analyticsQueue, TopicExchange bankingExchange) {
         return BindingBuilder.bind(analyticsQueue).to(bankingExchange).with("transaction.*");
+    }
+
+    @Bean
+    public Binding transactionReadBinding(Queue transactionReadQueue, TopicExchange bankingExchange) {
+        return BindingBuilder.bind(transactionReadQueue).to(bankingExchange).with("transaction.*");
+    }
+
+    @Bean
+    public Binding notificationTransactionBinding(Queue notificationQueue, TopicExchange bankingExchange) {
+        return BindingBuilder.bind(notificationQueue).to(bankingExchange).with("transaction.*");
+    }
+
+    @Bean
+    public Binding notificationLoanBinding(Queue notificationQueue, TopicExchange bankingExchange) {
+        return BindingBuilder.bind(notificationQueue).to(bankingExchange).with("loan.*");
+    }
+
+    @Bean
+    public Jackson2JsonMessageConverter jsonMessageConverter() {
+        Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter();
+        DefaultClassMapper classMapper = new DefaultClassMapper();
+        classMapper.setTrustedPackages("com.springbank.common.event", "java.util", "java.time");
+        converter.setClassMapper(classMapper);
+        return converter;
+    }
+
+    @Bean
+    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory, Jackson2JsonMessageConverter converter) {
+        RabbitTemplate template = new RabbitTemplate(connectionFactory);
+        template.setMessageConverter(converter);
+        return template;
+    }
+
+    @Bean
+    public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(ConnectionFactory connectionFactory, Jackson2JsonMessageConverter converter) {
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        factory.setMessageConverter(converter);
+        return factory;
     }
 }

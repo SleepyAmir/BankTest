@@ -30,7 +30,7 @@ public class AccountController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#accountReadService.getEntityById(#id).user.id, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#accountReadService.getById(#id).userId(), authentication)")
     public ResponseEntity<ApiResponse<AccountResponseDto>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Account found", accountReadService.getById(id), "/api/accounts/" + id));
     }
@@ -48,7 +48,7 @@ public class AccountController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#accountReadService.getEntityById(#id).user.id, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#accountReadService.getById(#id).userId(), authentication)")
     public ResponseEntity<ApiResponse<AccountResponseDto>> update(@PathVariable Long id, @RequestBody AccountUpdateDto dto) {
         return ResponseEntity.ok(ApiResponse.success("Account updated", accountWriteService.updateAccount(id, dto), "/api/accounts/" + id));
     }
@@ -61,19 +61,19 @@ public class AccountController {
     }
 
     @PostMapping("/{id}/deposit")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#accountReadService.getEntityById(#id).user.id, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#accountReadService.getById(#id).userId(), authentication)")
     public ResponseEntity<ApiResponse<AccountResponseDto>> deposit(@PathVariable Long id, @RequestParam BigDecimal amount) {
         return ResponseEntity.ok(ApiResponse.success("Deposit successful", accountWriteService.deposit(id, amount), "/api/accounts/" + id + "/deposit"));
     }
 
     @PostMapping("/{id}/withdraw")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#accountReadService.getEntityById(#id).user.id, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#accountReadService.getById(#id).userId(), authentication)")
     public ResponseEntity<ApiResponse<AccountResponseDto>> withdraw(@PathVariable Long id, @RequestParam BigDecimal amount) {
         return ResponseEntity.ok(ApiResponse.success("Withdrawal successful", accountWriteService.withdraw(id, amount), "/api/accounts/" + id + "/withdraw"));
     }
 
     @GetMapping("/{id}/balance")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#accountReadService.getEntityById(#id).user.id, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#accountReadService.getById(#id).userId(), authentication)")
     public ResponseEntity<ApiResponse<AccountBalanceDto>> getBalance(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Balance retrieved", accountReadService.getBalanceInternal(id), "/api/accounts/" + id + "/balance"));
     }

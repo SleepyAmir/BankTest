@@ -31,7 +31,7 @@ public class LoanController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#loanReadService.getEntityById(#id).user.id, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#loanReadService.getById(#id).userId(), authentication)")
     public ResponseEntity<ApiResponse<LoanResponseDto>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Loan found", loanReadService.getById(id), "/api/loans/" + id));
     }
@@ -43,7 +43,7 @@ public class LoanController {
     }
 
     @GetMapping("/{id}/installments")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#loanReadService.getEntityById(#id).user.id, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#loanReadService.getById(#id).userId(), authentication)")
     public ResponseEntity<ApiResponse<List<LoanInstallmentDto>>> getInstallments(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Loan installments", loanReadService.getInstallmentsByLoanId(id), "/api/loans/" + id + "/installments"));
     }

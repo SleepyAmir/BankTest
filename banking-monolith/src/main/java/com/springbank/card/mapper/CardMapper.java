@@ -17,6 +17,7 @@ public interface CardMapper {
     Card toEntity(CardCreateDto dto);
 
     @Mapping(source = "account.id", target = "accountId")
+    @Mapping(source = "account.user.id", target = "userId")
     CardResponseDto toDto(Card card);
 
     void updateFromDto(CardUpdateDto dto, @MappingTarget Card card);

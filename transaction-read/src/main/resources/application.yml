@@ -8,7 +8,7 @@ spring:
   application:
     name: transaction-read
   datasource:
-    url: jdbc:postgresql://localhost:5432/banking_transaction_db
+    url: jdbc:postgresql://localhost:5433/banking_transaction_db
     username: ${DB_USER:postgres}
     password: ${DB_PASS:postgres}
   jpa:

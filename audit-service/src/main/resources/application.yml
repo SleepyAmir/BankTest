@@ -8,7 +8,7 @@ spring:
   application:
     name: audit-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/banking_audit_db
+    url: jdbc:postgresql://localhost:5436/banking_audit_db
     username: ${DB_USER:postgres}
     password: ${DB_PASS:postgres}
   jpa:

@@ -28,7 +28,7 @@ public class CardController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#cardReadService.getEntityById(#id).account.user.id, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#cardReadService.getById(#id).userId(), authentication)")
     public ResponseEntity<ApiResponse<CardResponseDto>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Card found", cardReadService.getById(id), "/api/cards/" + id));
     }
@@ -46,7 +46,7 @@ public class CardController {
     }
 
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#cardReadService.getEntityById(#id).account.user.id, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#cardReadService.getById(#id).userId(), authentication)")
     public ResponseEntity<ApiResponse<CardResponseDto>> update(@PathVariable Long id, @RequestBody CardUpdateDto dto) {
         return ResponseEntity.ok(ApiResponse.success("Card updated", cardWriteService.updateCard(id, dto), "/api/cards/" + id));
     }
@@ -59,7 +59,7 @@ public class CardController {
     }
 
     @PostMapping("/{id}/block")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#cardReadService.getEntityById(#id).account.user.id, authentication)")
+    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#cardReadService.getById(#id).userId(), authentication)")
     public ResponseEntity<ApiResponse<CardResponseDto>> block(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Card blocked", cardWriteService.blockCard(id), "/api/cards/" + id + "/block"));
     }

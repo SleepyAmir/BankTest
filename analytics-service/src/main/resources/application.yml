@@ -8,7 +8,7 @@ spring:
   application:
     name: analytics-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/banking_analytics_db
+    url: jdbc:postgresql://localhost:5435/banking_analytics_db
     username: ${DB_USER:postgres}
     password: ${DB_PASS:postgres}
   jpa:

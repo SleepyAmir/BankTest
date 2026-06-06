@@ -15,5 +15,6 @@ public record CardResponseDto(
     BigDecimal dailyLimit,
     BigDecimal monthlyLimit,
     BigDecimal monthlySpent,
-    Long accountId
+    Long accountId,
+    Long userId
 ) {}
