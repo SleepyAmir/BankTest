@@ -94,7 +94,6 @@ services:
     ports:
       - "8081:8081"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
       - DB_HOST=postgres-monolith
       - DB_PORT=5432
       - DB_NAME=banking_monolith_db
@@ -114,6 +113,12 @@ services:
       - "8090:8090"
     environment:
       - REDIS_HOST=redis
+      - MONOLITH_URI=http://banking-monolith:8081
+      - TX_READ_URI=http://transaction-read:8087
+      - TX_WRITE_URI=http://transaction-write:8088
+      - FRAUD_URI=http://fraud-service:8091
+      - ANALYTICS_URI=http://analytics-service:8093
+      - AUDIT_URI=http://audit-service:8092
     depends_on:
       - banking-monolith
       - transaction-read
@@ -126,7 +131,6 @@ services:
     ports:
       - "8087:8087"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
       - DB_HOST=postgres-transaction
       - DB_PORT=5432
       - DB_NAME=banking_transaction_db
@@ -143,13 +147,13 @@ services:
     ports:
       - "8088:8088"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
       - DB_HOST=postgres-transaction
       - DB_PORT=5432
       - DB_NAME=banking_transaction_db
       - DB_USER=postgres
       - DB_PASS=postgres
       - RABBITMQ_HOST=rabbitmq
+      - MONOLITH_URL=http://banking-monolith:8081
     depends_on:
       - postgres-transaction
       - rabbitmq
@@ -160,7 +164,6 @@ services:
     ports:
       - "8091:8091"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
       - DB_HOST=postgres-fraud
       - DB_PORT=5432
       - DB_NAME=banking_fraud_db
@@ -177,7 +180,6 @@ services:
     ports:
       - "8093:8093"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
       - DB_HOST=postgres-analytics
       - DB_PORT=5432
       - DB_NAME=banking_analytics_db
@@ -194,7 +196,6 @@ services:
     ports:
       - "8092:8092"
     environment:
-      - SPRING_PROFILES_ACTIVE=docker
       - DB_HOST=postgres-audit
       - DB_PORT=5432
       - DB_NAME=banking_audit_db

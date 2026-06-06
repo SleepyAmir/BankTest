@@ -22,11 +22,11 @@ public class NotificationService {
     }
 
     public List<Notification> getAll() {
-        return notificationRepository.findAll();
+        return notificationRepository.findAllWithUser();
     }
 
     public Notification getById(Long id) {
-        return notificationRepository.findById(id)
+        return notificationRepository.findByIdWithUser(id)
                 .orElseThrow(() -> new RuntimeException("Notification not found: " + id));
     }
 

@@ -57,6 +57,7 @@ public class TransactionEventConsumer {
                     .fromAccountId(event.getFromAccountId())
                     .toAccountId(event.getToAccountId())
                     .cardId(event.getCardId())
+                    .userId(event.getUserId())
                     .build();
 
             transactionRepository.save(tx);

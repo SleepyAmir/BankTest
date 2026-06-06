@@ -15,33 +15,33 @@ spring:
     gateway:
       routes:
         - id: swagger-monolith
-          uri: http://localhost:8081
+          uri: ${MONOLITH_URI:http://localhost:8081}
           predicates:
             - Path=/swagger-ui/**,/v3/api-docs/**,/swagger-ui.html
         - id: monolith-all
-          uri: http://localhost:8081
+          uri: ${MONOLITH_URI:http://localhost:8081}
           predicates:
             - Path=/api/auth/**,/api/users/**,/api/accounts/**,/api/cards/**,/api/loans/**,/api/notifications/**,/api/roles/**,/api/permissions/**
         - id: transaction-read
-          uri: http://localhost:8087
+          uri: ${TX_READ_URI:http://localhost:8087}
           predicates:
             - Method=GET
             - Path=/api/transactions/**
         - id: transaction-write
-          uri: http://localhost:8088
+          uri: ${TX_WRITE_URI:http://localhost:8088}
           predicates:
             - Method=POST,PUT,DELETE
             - Path=/api/transactions/**
         - id: fraud-service
-          uri: http://localhost:8091
+          uri: ${FRAUD_URI:http://localhost:8091}
           predicates:
             - Path=/api/fraud/**
         - id: analytics-service
-          uri: http://localhost:8093
+          uri: ${ANALYTICS_URI:http://localhost:8093}
           predicates:
             - Path=/api/analytics/**
         - id: audit-service
-          uri: http://localhost:8092
+          uri: ${AUDIT_URI:http://localhost:8092}
           predicates:
             - Path=/api/audit/**
         - id: block-internal

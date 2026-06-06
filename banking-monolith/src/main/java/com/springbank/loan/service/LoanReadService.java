@@ -33,6 +33,12 @@ public class LoanReadService {
                 .orElseThrow(() -> new ResourceNotFoundException("Loan", id));
     }
 
+    public List<LoanResponseDto> getAll() {
+        return loanRepository.findAllActive().stream()
+                .map(loanMapper::toDto)
+                .collect(Collectors.toList());
+    }
+
     public List<LoanResponseDto> getByUserId(Long userId) {
         return loanRepository.findByUserId(userId).stream()
                 .map(loanMapper::toDto)

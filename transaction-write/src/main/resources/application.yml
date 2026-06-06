@@ -8,18 +8,18 @@ spring:
   application:
     name: transaction-write
   datasource:
-    url: jdbc:postgresql://localhost:5433/banking_transaction_db
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:banking_transaction_db}
     username: ${DB_USER:postgres}
     password: ${DB_PASS:postgres}
   jpa:
     hibernate:
       ddl-auto: update
   rabbitmq:
-    host: localhost
+    host: ${RABBITMQ_HOST:localhost}
     port: 5672
     username: guest
     password: guest
 
 services:
   monolith:
-    url: http://localhost:8081
+    url: ${MONOLITH_URL:http://localhost:8081}

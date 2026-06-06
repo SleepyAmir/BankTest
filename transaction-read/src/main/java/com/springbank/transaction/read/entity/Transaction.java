@@ -72,6 +72,9 @@ public class Transaction extends BaseEntity {
     @Column(name = "loan_installment_id")
     private Long loanInstallmentId;
 
+    @Column(name = "user_id")
+    private Long userId;
+
     // ======== HELPER METHODS ========
 
     public boolean isCompleted() {

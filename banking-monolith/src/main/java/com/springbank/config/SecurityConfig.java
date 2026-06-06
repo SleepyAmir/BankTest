@@ -205,6 +205,17 @@ public class SecurityConfig {
                                 "/api/super-admin/**"
                         ).hasRole("SUPER_ADMIN")
 
+                        // Internal endpoints — only localhost (inter-service calls)
+                        .requestMatchers("/internal/**")
+                        .access(new org.springframework.security.authorization.AuthorizationManager<org.springframework.security.web.access.intercept.RequestAuthorizationContext>() {
+                            @Override
+                            public org.springframework.security.authorization.AuthorizationDecision check(org.springframework.security.core.Authentication authentication, org.springframework.security.web.access.intercept.RequestAuthorizationContext context) {
+                                String remoteAddr = context.getRequest().getRemoteAddr();
+                                boolean allowed = "127.0.0.1".equals(remoteAddr) || "0:0:0:0:0:0:0:1".equals(remoteAddr) || "::1".equals(remoteAddr);
+                                return new org.springframework.security.authorization.AuthorizationDecision(allowed);
+                            }
+                        })
+
                         // Any other request requires authentication
                         .anyRequest().authenticated()
                 )

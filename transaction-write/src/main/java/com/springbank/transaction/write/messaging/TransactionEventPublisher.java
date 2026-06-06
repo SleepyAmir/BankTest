@@ -23,7 +23,7 @@ public class TransactionEventPublisher {
                 .fromAccountId(tx.getFromAccountId())
                 .toAccountId(tx.getToAccountId())
                 .cardId(tx.getCardId())
-                .userId(null) // Will be enriched or derived
+                .userId(tx.getUserId())
                 .amount(tx.getAmount())
                 .type(tx.getType().name())
                 .status(tx.getStatus().name())

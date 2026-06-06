@@ -27,7 +27,7 @@ public class LoanController {
     @GetMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<LoanResponseDto>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.success("All loans", loanReadService.getByUserId(null), "/api/loans"));
+        return ResponseEntity.ok(ApiResponse.success("All loans", loanReadService.getAll(), "/api/loans"));
     }
 
     @GetMapping("/{id}")

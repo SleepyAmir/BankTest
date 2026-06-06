@@ -15,5 +15,6 @@ public record TransactionCreateDto(
     String spendingCategory,
     String ipAddress,
     String deviceFingerprint,
-    String location
+    String location,
+    Long userId
 ) {}

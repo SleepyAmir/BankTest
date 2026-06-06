@@ -7,7 +7,6 @@ import org.springframework.amqp.rabbit.listener.SimpleRabbitListenerContainerFac
 import org.springframework.amqp.support.converter.DefaultClassMapper;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
-import org.springframework.boot.autoconfigure.amqp.RabbitListenerContainerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -98,7 +97,14 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public RabbitListenerContainerFactoryCustomizer<SimpleRabbitListenerContainerFactory> rabbitListenerContainerFactoryCustomizer(MessageConverter jsonMessageConverter) {
-        return factory -> factory.setMessageConverter(jsonMessageConverter);
+    public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
+            ConnectionFactory connectionFactory,
+            MessageConverter jsonMessageConverter) {
+        SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
+        factory.setConnectionFactory(connectionFactory);
+        factory.setMessageConverter(jsonMessageConverter);
+        factory.setConcurrentConsumers(1);
+        factory.setMaxConcurrentConsumers(5);
+        return factory;
     }
 }
