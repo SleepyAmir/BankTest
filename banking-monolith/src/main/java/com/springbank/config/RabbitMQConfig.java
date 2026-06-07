@@ -7,6 +7,7 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.DefaultClassMapper;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -46,37 +47,37 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public Binding auditBinding(Queue auditQueue, TopicExchange bankingExchange) {
+    public Binding auditBinding(@Qualifier("auditQueue") Queue auditQueue, TopicExchange bankingExchange) {
         return BindingBuilder.bind(auditQueue).to(bankingExchange).with("audit.*");
     }
 
     @Bean
-    public Binding notificationBinding(Queue notificationQueue, TopicExchange bankingExchange) {
+    public Binding notificationBinding(@Qualifier("notificationQueue") Queue notificationQueue, TopicExchange bankingExchange) {
         return BindingBuilder.bind(notificationQueue).to(bankingExchange).with("notification.*");
     }
 
     @Bean
-    public Binding fraudBinding(Queue fraudQueue, TopicExchange bankingExchange) {
+    public Binding fraudBinding(@Qualifier("fraudQueue") Queue fraudQueue, TopicExchange bankingExchange) {
         return BindingBuilder.bind(fraudQueue).to(bankingExchange).with("transaction.*");
     }
 
     @Bean
-    public Binding analyticsBinding(Queue analyticsQueue, TopicExchange bankingExchange) {
+    public Binding analyticsBinding(@Qualifier("analyticsQueue") Queue analyticsQueue, TopicExchange bankingExchange) {
         return BindingBuilder.bind(analyticsQueue).to(bankingExchange).with("transaction.*");
     }
 
     @Bean
-    public Binding transactionReadBinding(Queue transactionReadQueue, TopicExchange bankingExchange) {
+    public Binding transactionReadBinding(@Qualifier("transactionReadQueue") Queue transactionReadQueue, TopicExchange bankingExchange) {
         return BindingBuilder.bind(transactionReadQueue).to(bankingExchange).with("transaction.*");
     }
 
     @Bean
-    public Binding notificationTransactionBinding(Queue notificationQueue, TopicExchange bankingExchange) {
+    public Binding notificationTransactionBinding(@Qualifier("notificationQueue") Queue notificationQueue, TopicExchange bankingExchange) {
         return BindingBuilder.bind(notificationQueue).to(bankingExchange).with("transaction.*");
     }
 
     @Bean
-    public Binding notificationLoanBinding(Queue notificationQueue, TopicExchange bankingExchange) {
+    public Binding notificationLoanBinding(@Qualifier("notificationQueue") Queue notificationQueue, TopicExchange bankingExchange) {
         return BindingBuilder.bind(notificationQueue).to(bankingExchange).with("loan.*");
     }
 
