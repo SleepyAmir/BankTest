@@ -1,9 +1,9 @@
 package com.springbank.audit.config;
 
-import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.support.converter.DefaultClassMapper;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
@@ -12,7 +12,10 @@ import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class RabbitMQConfig {
+
     public static final String EXCHANGE = "banking.exchange";
+    public static final String AUDIT_QUEUE = "audit.queue";
+    public static final String AUDIT_ROUTING_KEY = "audit.#";
 
     @Bean
     public TopicExchange bankingExchange() {
@@ -20,22 +23,38 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue auditQueue() {
+        return QueueBuilder.durable(AUDIT_QUEUE).build();
+    }
+
+    @Bean
+    public Binding auditBinding(Queue auditQueue, TopicExchange bankingExchange) {
+        return BindingBuilder
+                .bind(auditQueue)
+                .to(bankingExchange)
+                .with(AUDIT_ROUTING_KEY);
+    }
+
+    @Bean
     public Jackson2JsonMessageConverter jsonMessageConverter() {
         Jackson2JsonMessageConverter converter = new Jackson2JsonMessageConverter();
         DefaultClassMapper classMapper = new DefaultClassMapper();
-        classMapper.setTrustedPackages("com.springbank.common.event", "java.util", "java.time");
+        classMapper.setTrustedPackages(
+                "com.springbank.common.event", "java.util", "java.time"
+        );
         converter.setClassMapper(classMapper);
         return converter;
     }
 
     @Bean
-    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory, MessageConverter jsonMessageConverter) {
+    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory,
+                                         MessageConverter jsonMessageConverter) {
         RabbitTemplate template = new RabbitTemplate(connectionFactory);
         template.setMessageConverter(jsonMessageConverter);
         return template;
     }
 
-    @Bean
+    @Bean(name = "rabbitListenerContainerFactory")
     public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory(
             ConnectionFactory connectionFactory,
             MessageConverter jsonMessageConverter) {
