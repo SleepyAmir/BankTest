@@ -64,9 +64,17 @@ public class LoanReadService {
 
     private LoanInstallmentDto toInstallmentDto(LoanInstallment i) {
         return new LoanInstallmentDto(
-                i.getId(), i.getInstallmentNumber(), i.getAmount(), i.getPrincipalPart(),
-                i.getInterestPart(), i.getDueDate(), i.getPaidDate(), i.getStatus(),
-                i.getLateFee(), i.getDaysOverdue()
+                i.getId(),
+                i.getLoan() != null ? i.getLoan().getId() : null,
+                i.getInstallmentNumber(),
+                i.getAmount(),
+                i.getPrincipalPart(),
+                i.getInterestPart(),
+                i.getDueDate(),
+                i.getPaidDate(),
+                i.getStatus(),
+                i.getLateFee(),
+                i.getDaysOverdue()
         );
     }
 }

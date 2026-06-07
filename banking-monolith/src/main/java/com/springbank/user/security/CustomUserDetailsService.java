@@ -44,11 +44,19 @@ public class CustomUserDetailsService implements UserDetailsService {
         // اعتبارسنجی ورودی
         validateUsername(username);
 
-        // بارگذاری کاربر با roles و permissions به صورت یکباره (JOIN FETCH)
+        // Check if user exists at all (even deleted) for debugging
+        var anyUser = userRepository.findByUsername(username);
+        if (anyUser.isEmpty()) {
+            log.warn("❌ User not found in database: {}", username);
+        } else if (anyUser.get().isDeleted()) {
+            log.warn("❌ User found but is soft-deleted: {}", username);
+        }
+
+        // بارگذاری کاربر با roles و permissions به صورت یکباره (JOIN FETCH) — فقط کاربران فعال
         return userRepository.findByUsernameWithRolesAndPermissions(username)
                 .map(SecurityUser::new)
                 .orElseThrow(() -> {
-                    log.warn("❌ User not found: {}", username);
+                    log.warn("❌ User not found or deleted: {}", username);
                     return new UsernameNotFoundException("User not found: " + username);
                 });
     }

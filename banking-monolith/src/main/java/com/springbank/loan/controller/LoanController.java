@@ -78,4 +78,12 @@ public class LoanController {
         loanWriteService.deleteLoan(id);
         return ResponseEntity.ok(ApiResponse.success("Loan deleted", null, "/api/loans/" + id));
     }
+
+    @PostMapping("/installments/{installmentId}/pay")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('CUSTOMER')")
+    public ResponseEntity<ApiResponse<LoanInstallmentDto>> payInstallment(@PathVariable Long installmentId,
+                                                                          @RequestParam java.math.BigDecimal amount) {
+        LoanInstallmentDto dto = loanWriteService.payInstallment(installmentId, amount);
+        return ResponseEntity.ok(ApiResponse.success("Installment paid successfully", dto, "/api/loans/installments/" + installmentId + "/pay"));
+    }
 }

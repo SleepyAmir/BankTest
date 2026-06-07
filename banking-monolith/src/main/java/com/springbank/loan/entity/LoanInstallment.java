@@ -57,6 +57,10 @@ public class LoanInstallment extends BaseEntity {
     @Builder.Default
     private Integer daysOverdue = 0;
 
+    // مبلغ واقعی پرداخت‌شده
+    @Column(name = "paid_amount", precision = 19, scale = 4)
+    private BigDecimal paidAmount;
+
     // ======== RELATIONS ========
 
     @ManyToOne(fetch = FetchType.LAZY)

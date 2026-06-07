@@ -165,6 +165,56 @@ public class LoanWriteService {
         log.info("[LOAN-DELETE] ✅ Loan id={} soft-deleted", id);
     }
 
+    @Auditable(action = "PAY_INSTALLMENT", entity = "LoanInstallment")
+    public com.springbank.loan.dto.LoanInstallmentDto payInstallment(Long installmentId, java.math.BigDecimal amount) {
+        log.info("[LOAN-PAY] Paying installment id={}, amount={}", installmentId, amount);
+
+        LoanInstallment inst = installmentRepository.findActiveById(installmentId)
+                .orElseThrow(() -> {
+                    log.error("[LOAN-PAY] ❌ Installment not found id={}", installmentId);
+                    return new ResourceNotFoundException("Loan Installment", installmentId);
+                });
+
+        if (inst.getStatus() == com.springbank.common.enums.InstallmentStatus.PAID) {
+            log.error("[LOAN-PAY] ❌ Installment already paid id={}", installmentId);
+            throw new IllegalStateException("Installment already paid");
+        }
+
+        if (amount.compareTo(inst.getAmount().add(inst.getLateFee())) < 0) {
+            log.error("[LOAN-PAY] ❌ Insufficient amount. Required={}, Sent={}", inst.getAmount().add(inst.getLateFee()), amount);
+            throw new IllegalArgumentException("Amount is less than required installment + late fee");
+        }
+
+        inst.setStatus(com.springbank.common.enums.InstallmentStatus.PAID);
+        inst.setPaidDate(java.time.LocalDate.now());
+        inst.setPaidAmount(amount);
+
+        Loan loan = inst.getLoan();
+        loan.setRemainingAmount(loan.getRemainingAmount().subtract(inst.getAmount()));
+        if (loan.getRemainingAmount().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            loan.setStatus(LoanStatus.COMPLETED);
+            log.info("[LOAN-PAY] Loan id={} fully repaid. Status changed to COMPLETED.", loan.getId());
+        }
+
+        LoanInstallment saved = installmentRepository.save(inst);
+        loanRepository.save(loan);
+        log.info("[LOAN-PAY] ✅ Installment id={} paid. Loan remaining={}", saved.getId(), loan.getRemainingAmount());
+
+        return new com.springbank.loan.dto.LoanInstallmentDto(
+                saved.getId(),
+                saved.getLoan().getId(),
+                saved.getInstallmentNumber(),
+                saved.getAmount(),
+                saved.getPrincipalPart(),
+                saved.getInterestPart(),
+                saved.getDueDate(),
+                saved.getPaidDate(),
+                saved.getStatus(),
+                saved.getLateFee(),
+                saved.getDaysOverdue()
+        );
+    }
+
     /**
      * Generate monthly installment schedule using PMT formula
      */

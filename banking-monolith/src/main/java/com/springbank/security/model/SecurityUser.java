@@ -83,7 +83,8 @@ public final class SecurityUser implements UserDetails, Serializable {
         Set<GrantedAuthority> authorities = new HashSet<>();
 
         for (Role role : user.getRoles()) {
-            authorities.add(new SimpleGrantedAuthority(role.getName()));
+            // Spring Security's hasRole('ADMIN') checks for ROLE_ADMIN
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));
             for (Permission permission : role.getPermissions()) {
                 authorities.add(new SimpleGrantedAuthority(permission.getName()));
             }
@@ -154,8 +155,9 @@ public final class SecurityUser implements UserDetails, Serializable {
         if (roleName == null) {
             return false;
         }
+        String withPrefix = "ROLE_" + roleName;
         return authorities.stream()
-                .anyMatch(authority -> roleName.equals(authority.getAuthority()));
+                .anyMatch(authority -> withPrefix.equals(authority.getAuthority()));
     }
 
     public boolean hasPermission(String permissionName) {
