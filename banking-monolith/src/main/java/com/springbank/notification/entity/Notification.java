@@ -3,7 +3,6 @@ package com.springbank.notification.entity;
 import com.springbank.common.entity.BaseEntity;
 import com.springbank.common.enums.NotificationChannel;
 import com.springbank.common.enums.NotificationType;
-import com.springbank.loan.entity.Loan;
 import com.springbank.user.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -50,7 +49,7 @@ public class Notification extends BaseEntity {
     @Column(name = "transaction_id")
     private Long transactionId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "loan_id")
-    private Loan loan;
+    // Loan is in the same monolith — store ID only (not JPA relation for flexibility)
+    @Column(name = "loan_id")
+    private Long loanId;
 }
