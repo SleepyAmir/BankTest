@@ -62,6 +62,33 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder(12);
     }
 
+    /**
+     * آیا آدرس متعلق به loopback یا شبکه‌ی خصوصی داخلی است؟
+     * شامل: 127.0.0.1، ::1، و رنج‌های خصوصی (10.x، 172.16-31.x، 192.168.x) برای کارکرد در Docker.
+     */
+    private static boolean isInternalAddress(String addr) {
+        if (addr == null) return false;
+        if ("127.0.0.1".equals(addr) || "::1".equals(addr) || "0:0:0:0:0:0:0:1".equals(addr)) {
+            return true;
+        }
+        if (addr.startsWith("10.") || addr.startsWith("192.168.")) {
+            return true;
+        }
+        // 172.16.0.0 – 172.31.255.255 (رنج خصوصی پیش‌فرض Docker)
+        if (addr.startsWith("172.")) {
+            String[] parts = addr.split("\\.");
+            if (parts.length > 1) {
+                try {
+                    int second = Integer.parseInt(parts[1]);
+                    return second >= 16 && second <= 31;
+                } catch (NumberFormatException ignored) {
+                    return false;
+                }
+            }
+        }
+        return false;
+    }
+
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
         return config.getAuthenticationManager();
@@ -135,10 +162,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/super-admin/**").hasRole("SUPER_ADMIN")
                         .requestMatchers("/internal/**")
                         .access((authentication, context) -> {
+                            // endpointهای داخلی سرویس‌به‌سرویس: loopback + شبکه‌ی خصوصی داخلی (Docker).
+                            // این مسیرها به بیرون expose نمی‌شوند؛ فقط از داخل شبکه‌ی سرویس‌ها قابل دسترسی‌اند.
                             String remoteAddr = context.getRequest().getRemoteAddr();
-                            boolean allowed = "127.0.0.1".equals(remoteAddr)
-                                    || "0:0:0:0:0:0:0:1".equals(remoteAddr)
-                                    || "::1".equals(remoteAddr);
+                            boolean allowed = isInternalAddress(remoteAddr);
                             return new org.springframework.security.authorization.AuthorizationDecision(allowed);
                         })
                         .anyRequest().authenticated()

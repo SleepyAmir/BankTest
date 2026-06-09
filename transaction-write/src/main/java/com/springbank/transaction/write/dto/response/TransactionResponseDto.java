@@ -1,4 +1,4 @@
-package com.springbank.transaction.write.dto;
+package com.springbank.transaction.write.dto.response;
 
 import com.springbank.common.enums.TransactionStatus;
 import com.springbank.common.enums.TransactionType;

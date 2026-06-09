@@ -2,7 +2,7 @@ package com.springbank.transaction.write.mapper;
 
 import com.springbank.common.enums.TransactionStatus;
 import com.springbank.common.enums.TransactionType;
-import com.springbank.transaction.write.dto.TransactionResponseDto;
+import com.springbank.transaction.write.dto.response.TransactionResponseDto;
 import com.springbank.transaction.write.dto.request.TransactionCreateDto;
 import com.springbank.transaction.write.entity.Transaction;
 import java.math.BigDecimal;

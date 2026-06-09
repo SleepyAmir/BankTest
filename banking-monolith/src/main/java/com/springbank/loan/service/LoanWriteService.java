@@ -7,7 +7,6 @@ import com.springbank.common.enums.InstallmentStatus;
 import com.springbank.common.enums.LoanStatus;
 import com.springbank.common.enums.NotificationType;
 import com.springbank.common.enums.TransactionType;
-import com.springbank.common.event.TransactionCompletedEvent;
 import com.springbank.common.exception.BusinessException;
 import com.springbank.common.exception.ResourceNotFoundException;
 import com.springbank.loan.dto.LoanCreateDto;
@@ -37,7 +36,6 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * ============================================================================
@@ -59,9 +57,9 @@ public class LoanWriteService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final RabbitTemplate rabbitTemplate;
+    private final com.springbank.loan.client.TransactionServiceClient transactionServiceClient;
 
     public static final String EXCHANGE = "banking.exchange";
-    public static final String ROUTING_TX_COMPLETED = "transaction.completed";
 
     // ===================== فلوی ۹: درخواست وام =====================
 
@@ -141,19 +139,19 @@ public class LoanWriteService {
         installmentRepository.saveAll(installments);
         log.info("[LOAN-APPROVE] ✅ {} قسط ساخته شد", installments.size());
 
-        // واریز مبلغ وام به حساب کاربر (اتمیک، در همین تراکنش)
-        Account account = accountRepository.findActiveById(loan.getAccount().getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Account", loan.getAccount().getId()));
-        account.deposit(loan.getAmount());
-        accountRepository.save(account);
-        log.info("[LOAN-APPROVE] ✅ مبلغ {} به حساب id={} واریز شد. موجودی جدید={}",
-                loan.getAmount(), account.getId(), account.getBalance());
-
         Loan saved = loanRepository.save(loan);
 
-        // رویداد تراکنش واریز وام (LOAN_DISBURSEMENT) برای میکروسرویس‌ها
-        publishTransaction(loan.getUser().getId(), null, account.getId(), loan.getAmount(),
-                TransactionType.LOAN_DISBURSEMENT, "loan");
+        // واریز مبلغ وام از طریق transaction-write (تنها مرجع تراکنش — جابجایی اتمیک + ثبت تراکنش)
+        boolean disbursed = transactionServiceClient.createTransaction(
+                TransactionType.LOAN_DISBURSEMENT, loan.getAmount(),
+                null, loan.getAccount().getId(), loan.getUser().getId(),
+                "loan", "Loan disbursement for loan #" + saved.getId());
+        if (!disbursed) {
+            // اگر واریز ناموفق بود، کل تأیید را برگردان (تراکنش DB rollback می‌شود)
+            throw new IllegalStateException("واریز مبلغ وام ناموفق بود. تأیید لغو شد.");
+        }
+        log.info("[LOAN-APPROVE] ✅ مبلغ {} به حساب id={} واریز شد (از طریق transaction-write)",
+                loan.getAmount(), loan.getAccount().getId());
 
         // رویداد تأیید وام برای نوتیفیکیشن
         publishLoanApproved(saved, approvedBy);
@@ -214,13 +212,20 @@ public class LoanWriteService {
 
         BigDecimal totalDue = inst.getAmount().add(lateFee);
 
-        // کسر اتمیک از حساب کاربر
+        // پیش‌بررسی موجودی برای پیام بهتر (کسر واقعی توسط transaction-write انجام می‌شود)
         if (account.getBalance().compareTo(totalDue) < 0) {
             throw new BusinessException(String.format(
                     "موجودی حساب کافی نیست. مبلغ قسط + جریمه: %s، موجودی: %s", totalDue, account.getBalance()));
         }
-        account.withdraw(totalDue);
-        accountRepository.save(account);
+
+        // کسر اتمیک از حساب از طریق transaction-write (تنها مرجع تراکنش)
+        boolean paid = transactionServiceClient.createTransaction(
+                TransactionType.LOAN_PAYMENT, totalDue,
+                account.getId(), null, loan.getUser().getId(),
+                "loan-installment", "Installment #" + inst.getInstallmentNumber() + " for loan #" + loan.getId());
+        if (!paid) {
+            throw new IllegalStateException("کسر مبلغ قسط از حساب ناموفق بود.");
+        }
 
         // ثبت پرداخت
         inst.setStatus(InstallmentStatus.PAID);
@@ -240,10 +245,6 @@ public class LoanWriteService {
 
         // اثر بر امتیاز اعتباری (پرداخت به‌موقع مثبت، با تأخیر منفی)
         creditScoreService.recordInstallmentPayment(loan.getUser().getId(), !late);
-
-        // رویداد تراکنش پرداخت قسط
-        publishTransaction(loan.getUser().getId(), account.getId(), null, totalDue,
-                TransactionType.LOAN_PAYMENT, "loan-installment");
 
         // نوتیفیکیشن
         String msg = late
@@ -288,26 +289,6 @@ public class LoanWriteService {
             list.add(inst);
         }
         return list;
-    }
-
-    private void publishTransaction(Long userId, Long fromAccountId, Long toAccountId,
-                                    BigDecimal amount, TransactionType type, String category) {
-        try {
-            TransactionCompletedEvent event = TransactionCompletedEvent.builder()
-                    .trackingCode("TXN" + UUID.randomUUID().toString().replace("-", "").substring(0, 20).toUpperCase())
-                    .fromAccountId(fromAccountId)
-                    .toAccountId(toAccountId)
-                    .userId(userId)
-                    .amount(amount)
-                    .type(type.name())
-                    .status("COMPLETED")
-                    .spendingCategory(category)
-                    .timestamp(LocalDateTime.now())
-                    .build();
-            rabbitTemplate.convertAndSend(EXCHANGE, ROUTING_TX_COMPLETED, event);
-        } catch (Exception e) {
-            log.warn("[LOAN] ⚠️ انتشار رویداد تراکنش ناموفق بود: {}", e.getMessage());
-        }
     }
 
     private void publishLoanApproved(Loan saved, String approvedBy) {

@@ -16,7 +16,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -72,17 +71,8 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponse.success("Account deleted", null, "/api/accounts/" + id));
     }
 
-    @PostMapping("/{id}/deposit")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(@accountReadService.getById(#id).userId(), authentication)")
-    public ResponseEntity<ApiResponse<AccountResponseDto>> deposit(@PathVariable Long id, @RequestParam BigDecimal amount) {
-        return ResponseEntity.ok(ApiResponse.success("Deposit successful", accountWriteService.deposit(id, amount), "/api/accounts/" + id + "/deposit"));
-    }
-
-    @PostMapping("/{id}/withdraw")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(@accountReadService.getById(#id).userId(), authentication)")
-    public ResponseEntity<ApiResponse<AccountResponseDto>> withdraw(@PathVariable Long id, @RequestParam BigDecimal amount) {
-        return ResponseEntity.ok(ApiResponse.success("Withdrawal successful", accountWriteService.withdraw(id, amount), "/api/accounts/" + id + "/withdraw"));
-    }
+    // توجه: شارژ/برداشت/انتقال کاربر از طریق transaction-write انجام می‌شود (تنها مرجع تراکنش).
+    // endpointهای مستقیم deposit/withdraw از این کنترلر حذف شدند تا مسیر موازی نباشد.
 
     @GetMapping("/{id}/balance")
     @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(@accountReadService.getById(#id).userId(), authentication)")

@@ -1,12 +1,13 @@
 package com.springbank.internal;
 
 import com.springbank.account.dto.AccountBalanceDto;
-import com.springbank.account.dto.AccountResponseDto;
+import com.springbank.account.dto.InternalTransferDto;
+import com.springbank.account.dto.TransactionResultDto;
 import com.springbank.account.service.AccountReadService;
-import com.springbank.account.service.AccountWriteService;
-import com.springbank.common.exception.ResourceNotFoundException;
+import com.springbank.account.service.MoneyMovementService;
 import com.springbank.user.dto.UserResponseDto;
 import com.springbank.user.service.UserService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
@@ -21,8 +22,18 @@ import java.util.Map;
 public class InternalController {
 
     private final AccountReadService accountReadService;
-    private final AccountWriteService accountWriteService;
+    private final MoneyMovementService moneyMovementService;
     private final UserService userService;
+
+    /**
+     * انتقال وجه «اتمیک» سرویس‌به‌سرویس (فراخوانی از transaction-write).
+     * کل برداشت+واریز در یک تراکنش DB انجام می‌شود → جایگزین دو فراخوانی جدای قبلی.
+     */
+    @PostMapping("/accounts/transfer")
+    public TransactionResultDto transfer(@Valid @RequestBody InternalTransferDto dto) {
+        log.debug("Internal atomic transfer: {} -> {} amount {}", dto.fromAccountId(), dto.toAccountId(), dto.amount());
+        return moneyMovementService.transferAtomic(dto);
+    }
 
     @GetMapping("/accounts/{id}/balance")
     public AccountBalanceDto getBalance(@PathVariable Long id) {
@@ -31,15 +42,15 @@ public class InternalController {
     }
 
     @PostMapping("/accounts/{id}/deposit")
-    public AccountResponseDto deposit(@PathVariable Long id, @RequestParam BigDecimal amount) {
-        log.debug("Internal deposit request for account: {} amount: {}", id, amount);
-        return accountWriteService.deposit(id, amount);
+    public TransactionResultDto deposit(@PathVariable Long id, @RequestParam BigDecimal amount) {
+        log.debug("Internal atomic deposit for account: {} amount: {}", id, amount);
+        return moneyMovementService.depositAtomic(id, amount);
     }
 
     @PostMapping("/accounts/{id}/withdraw")
-    public AccountResponseDto withdraw(@PathVariable Long id, @RequestParam BigDecimal amount) {
-        log.debug("Internal withdraw request for account: {} amount: {}", id, amount);
-        return accountWriteService.withdraw(id, amount);
+    public TransactionResultDto withdraw(@PathVariable Long id, @RequestParam BigDecimal amount) {
+        log.debug("Internal atomic withdraw for account: {} amount: {}", id, amount);
+        return moneyMovementService.withdrawAtomic(id, amount);
     }
 
     @GetMapping("/users/{id}")
