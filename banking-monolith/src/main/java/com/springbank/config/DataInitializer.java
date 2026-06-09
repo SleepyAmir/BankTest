@@ -1,7 +1,9 @@
 package com.springbank.config;
 
 import com.springbank.account.entity.Account;
+import com.springbank.account.entity.Branch;
 import com.springbank.account.repository.AccountRepository;
+import com.springbank.account.repository.BranchRepository;
 import com.springbank.card.entity.Card;
 import com.springbank.card.repository.CardRepository;
 import com.springbank.common.enums.*;
@@ -43,6 +45,7 @@ import java.util.Set;
  */
 @Slf4j
 @Component
+@org.springframework.context.annotation.Profile("!prod") // داده‌ی نمونه فقط خارج از محیط production ساخته می‌شود
 @RequiredArgsConstructor
 public class DataInitializer {
 
@@ -50,6 +53,7 @@ public class DataInitializer {
     private final RoleRepository roleRepository;
     private final PermissionRepository permissionRepository;
     private final AccountRepository accountRepository;
+    private final BranchRepository branchRepository;
     private final CardRepository cardRepository;
     private final CreditScoreRepository creditScoreRepository;
     private final LoanRepository loanRepository;
@@ -72,7 +76,9 @@ public class DataInitializer {
         // ======== ROLES (idempotent) ========
         Role adminRole = upsertRole("ADMIN", "System Administrator");
         Role customerRole = upsertRole("CUSTOMER", "Bank Customer");
-        log.info("[INIT-ROLE] ✅ Roles ready: ADMIN id={}, CUSTOMER id={}", adminRole.getId(), customerRole.getId());
+        Role managerRole = upsertRole("MANAGER", "Branch Manager"); // برای بررسی/تأیید KYC و مدیریت شعبه
+        log.info("[INIT-ROLE] ✅ Roles ready: ADMIN id={}, CUSTOMER id={}, MANAGER id={}",
+                adminRole.getId(), customerRole.getId(), managerRole.getId());
 
         // Assign permissions to ADMIN role (in-place, avoid replacing collection)
         if (adminRole.getPermissions() == null || adminRole.getPermissions().isEmpty()) {
@@ -84,12 +90,17 @@ public class DataInitializer {
         // ======== USERS (idempotent) ========
         User admin = upsertUser("admin", "admin123", "admin@springbank.com", "System", "Admin", "09120000000", Set.of(adminRole));
         User customer = upsertUser("customer", "customer123", "customer@springbank.com", "Ali", "Ahmadi", "09121111111", Set.of(customerRole));
-        log.info("[INIT-USER] ✅ Admin user id={}, Customer user id={}", admin.getId(), customer.getId());
+        User manager = upsertUser("manager", "manager123", "manager@springbank.com", "Reza", "Karimi", "09122222222", Set.of(managerRole));
+        log.info("[INIT-USER] ✅ Admin id={}, Customer id={}, Manager id={}", admin.getId(), customer.getId(), manager.getId());
 
         // ======== KYC (idempotent) ========
         upsertKyc(admin, KycStatus.APPROVED, KycLevel.ENHANCED, "system");
         upsertKyc(customer, KycStatus.PENDING, KycLevel.BASIC, null);
         log.info("[INIT-KYC] ✅ KYC ready");
+
+        // ======== BRANCH (idempotent) ========
+        upsertBranch("BR001", "شعبه مرکزی", "Tehran");
+        log.info("[INIT-BRANCH] ✅ Branch ready (code=BR001)");
 
         // ======== CREDIT SCORE (idempotent) ========
         CreditScore creditScore = upsertCreditScore(customer);
@@ -114,6 +125,7 @@ public class DataInitializer {
         log.info("[INIT-DONE] ==================== DATA SEED COMPLETE ====================");
         log.info("[INIT-DONE] 🔑 Login as admin:    username=admin    password=admin123");
         log.info("[INIT-DONE] 🔑 Login as customer: username=customer password=customer123");
+        log.info("[INIT-DONE] 🔑 Login as manager:  username=manager  password=manager123");
     }
 
     // ========================= HELPER METHODS =========================
@@ -168,6 +180,23 @@ public class DataInitializer {
                     .build();
             kycVerificationRepository.save(kyc);
         }
+    }
+
+    private Branch upsertBranch(String code, String name, String city) {
+        return branchRepository.findByCode(code)
+                .orElseGet(() -> {
+                    log.info("[INIT-BRANCH] Creating branch: {} ({})", name, code);
+                    Branch b = Branch.builder()
+                            .code(code)
+                            .name(name)
+                            .city(city)
+                            .address(city + " - خیابان اصلی")
+                            .phone("02112345678")
+                            .managerName("Reza Karimi")
+                            .isActive(true)
+                            .build();
+                    return branchRepository.save(b);
+                });
     }
 
     private CreditScore upsertCreditScore(User user) {
