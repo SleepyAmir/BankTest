@@ -4,6 +4,7 @@ import com.springbank.common.event.TransactionCompletedEvent;
 import com.springbank.fraud.service.FraudAnalysisService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.annotation.RabbitHandler;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
@@ -11,9 +12,10 @@ import org.springframework.stereotype.Component;
  * ============================================================================
  * FRAUD EVENT CONSUMER
  * ============================================================================
- * Listens to: fraud.queue (routing: transaction.*)
- * Source: transaction-write publishes after creating/completing a transaction
- * Action: Triggers fraud scoring rules and creates FraudAlert/AMLAlert
+ * Listens to: fraud.queue (routing: transaction.#)
+ * فقط TransactionCompletedEvent را پردازش می‌کند؛ سایر رویدادهای transaction.*
+ * (مثلاً transaction.blocked که خود fraud منتشر می‌کند) نادیده گرفته می‌شوند تا
+ * از حلقه‌ی پردازش جلوگیری شود.
  *
  * LOG MARKERS: [FRAUD-RECV] [FRAUD-PROC] [FRAUD-ERR]
  * ============================================================================
@@ -21,26 +23,28 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
+@RabbitListener(queues = "fraud.queue")
 public class FraudEventConsumer {
 
     private final FraudAnalysisService fraudAnalysisService;
 
-    @RabbitListener(queues = "fraud.queue")
+    @RabbitHandler
     public void handleTransactionCompleted(TransactionCompletedEvent event) {
-        log.info("[FRAUD-RECV] ==================== FRAUD CHECK ====================");
-        log.info("[FRAUD-RECV] Received TransactionCompletedEvent: txId={}, trackingCode={}, amount={}, userId={}",
-                event.getTransactionId(), event.getTrackingCode(), event.getAmount(), event.getUserId());
-
+        log.info("[FRAUD-RECV] دریافت TransactionCompletedEvent: trackingCode={}, amount={}, userId={}",
+                event.getTrackingCode(), event.getAmount(), event.getUserId());
         try {
-            log.info("[FRAUD-PROC] Running fraud analysis rules...");
             fraudAnalysisService.analyzeTransaction(event);
-            log.info("[FRAUD-PROC] ✅ Fraud analysis complete for txId={}", event.getTransactionId());
-            log.info("[FRAUD-PROC] ✅ Query via GET /api/fraud/alerts/user/{} or /api/fraud/alerts", event.getUserId());
+            log.info("[FRAUD-PROC] ✅ تحلیل تقلب کامل شد برای trackingCode={}", event.getTrackingCode());
         } catch (Exception e) {
-            log.error("[FRAUD-ERR] ❌ Fraud analysis failed for txId={}: {}", event.getTransactionId(), e.getMessage());
-            log.error("[FRAUD-ERR] ⚠️ Transaction was NOT evaluated for fraud! Check fraud DB (port 5434).");
+            log.error("[FRAUD-ERR] ❌ تحلیل تقلب ناموفق بود برای trackingCode={}: {}",
+                    event.getTrackingCode(), e.getMessage(), e);
             throw e;
         }
-        log.info("[FRAUD-RECV] ==================== FRAUD DONE ====================\n");
+    }
+
+    /** سایر رویدادها (مثل transaction.blocked) نادیده گرفته می‌شوند. */
+    @RabbitHandler(isDefault = true)
+    public void handleOther(Object event) {
+        log.debug("[FRAUD-RECV] رویداد نامرتبط نادیده گرفته شد: {}", event.getClass().getSimpleName());
     }
 }

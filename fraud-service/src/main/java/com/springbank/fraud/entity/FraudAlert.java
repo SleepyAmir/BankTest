@@ -54,8 +54,12 @@ public class FraudAlert extends BaseEntity {
 
     // ======== CROSS-SERVICE IDs (no JPA relations to other services) ========
 
-    @Column(name = "transaction_id", nullable = false)
+    // ممکن است null باشد وقتی منبع تراکنش، شناسه‌ی عددی ندارد (تکیه بر trackingCode)
+    @Column(name = "transaction_id")
     private Long transactionId;
+
+    @Column(name = "tracking_code", length = 40)
+    private String trackingCode;
 
     @Column(name = "user_id", nullable = false)
     private Long userId;

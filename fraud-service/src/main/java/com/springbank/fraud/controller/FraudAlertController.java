@@ -27,6 +27,12 @@ public class FraudAlertController {
         return ResponseEntity.ok(ApiResponse.success("All fraud alerts", fraudAnalysisService.getAllFraudAlerts(), "/api/fraud/alerts"));
     }
 
+    @GetMapping("/alerts/blocked")
+    public ResponseEntity<ApiResponse<List<FraudAlertDto>>> getBlocked() {
+        return ResponseEntity.ok(ApiResponse.success("Blocked transactions",
+                fraudAnalysisService.getBlockedAlerts(), "/api/fraud/alerts/blocked"));
+    }
+
     @GetMapping("/aml/user/{userId}")
     public ResponseEntity<ApiResponse<List<AmlAlertDto>>> getAmlByUser(@PathVariable Long userId) {
         return ResponseEntity.ok(ApiResponse.success("AML alerts", fraudAnalysisService.getAmlAlertsByUser(userId), "/api/fraud/aml/user/" + userId));

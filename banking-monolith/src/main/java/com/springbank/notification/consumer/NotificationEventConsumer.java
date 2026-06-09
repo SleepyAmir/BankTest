@@ -2,6 +2,7 @@ package com.springbank.notification.consumer;
 
 import com.springbank.common.event.FraudDetectedEvent;
 import com.springbank.common.event.LoanApprovedEvent;
+import com.springbank.common.event.TransactionBlockedEvent;
 import com.springbank.common.event.TransactionCompletedEvent;
 import com.springbank.common.enums.NotificationChannel;
 import com.springbank.common.enums.NotificationType;
@@ -73,6 +74,19 @@ public class NotificationEventConsumer {
                 "A suspicious transaction has been detected on your account. Risk level: " + event.getRiskLevel());
         if (notification != null) {
             pushSse(event.getUserId(), "FRAUD_ALERT", "Fraud Alert", notification.getMessage());
+        }
+    }
+
+    @RabbitHandler
+    public void handleTransactionBlocked(TransactionBlockedEvent event) {
+        log.info("[NOTIF-RECV] Received TransactionBlockedEvent: trackingCode={}, userId={}, riskLevel={}",
+                event.getTrackingCode(), event.getUserId(), event.getRiskLevel());
+        var notification = createNotification(event.getUserId(), NotificationType.FRAUD_ALERT,
+                "تراکنش مسدود شد",
+                "تراکنش شما به مبلغ " + event.getAmount() + " به دلیل ریسک تقلب مسدود شد. کد پیگیری: "
+                        + event.getTrackingCode());
+        if (notification != null) {
+            pushSse(event.getUserId(), "TRANSACTION_BLOCKED", "تراکنش مسدود شد", notification.getMessage());
         }
     }
 
