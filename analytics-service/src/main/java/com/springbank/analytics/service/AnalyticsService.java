@@ -81,6 +81,7 @@ public class AnalyticsService {
         }
 
         snapshot.calculateSavingsRate();
+        calculateComparedToPrevMonth(snapshot);
         spendingSnapshotRepository.save(snapshot);
         log.info("[ANALYTICS-SAVE] ✅ Snapshot saved for userId={}, month={}. TotalIncome={}, TotalExpense={}, TxCount={}, SavingsRate={}",
                 snapshot.getUserId(), snapshot.getSnapshotMonth(),
@@ -91,9 +92,29 @@ public class AnalyticsService {
     private boolean isIncome(TransactionCompletedEvent event) {
         return event.getType() != null && (
                 event.getType().equals("DEPOSIT") ||
-                event.getType().equals("SALARY") ||
-                event.getType().equals("REFUND")
+                        event.getType().equals("SALARY") ||
+                        event.getType().equals("REFUND") ||
+                        event.getType().equals("LOAN_DISBURSEMENT")
         );
+    }
+
+    /**
+     * محاسبه‌ی درصد تغییر هزینه نسبت به ماه قبل (compared_to_prev_month) — فلوی ۱۲.
+     * مقدار مثبت = افزایش هزینه نسبت به ماه قبل.
+     */
+    private void calculateComparedToPrevMonth(SpendingSnapshot snapshot) {
+        YearMonth prevMonth = snapshot.getSnapshotMonth().minusMonths(1);
+        spendingSnapshotRepository.findByUserIdAndSnapshotMonth(snapshot.getUserId(), prevMonth)
+                .ifPresent(prev -> {
+                    BigDecimal prevExpense = prev.getTotalExpense();
+                    if (prevExpense != null && prevExpense.compareTo(BigDecimal.ZERO) > 0) {
+                        BigDecimal change = snapshot.getTotalExpense().subtract(prevExpense)
+                                .divide(prevExpense, 4, java.math.RoundingMode.HALF_UP)
+                                .multiply(new BigDecimal("100"))
+                                .setScale(2, java.math.RoundingMode.HALF_UP);
+                        snapshot.setComparedToPrevMonth(change);
+                    }
+                });
     }
 
     @Transactional(readOnly = true)
@@ -115,6 +136,29 @@ public class AnalyticsService {
                     log.error("[ANALYTICS-QUERY] ❌ Snapshot not found for userId={}, month={}", userId, month);
                     return new RuntimeException("Snapshot not found for userId=" + userId + " month=" + month);
                 });
+    }
+
+    /**
+     * نهایی‌سازی اسنپ‌شات‌های یک ماه: محاسبه‌ی مجدد savingsRate و comparedToPrevMonth.
+     * توسط تسک زمان‌بندی‌شده‌ی پایان ماه فراخوانی می‌شود (فلوی ۱۲).
+     *
+     * @param month ماه هدف
+     * @return تعداد اسنپ‌شات‌های نهایی‌شده
+     */
+    @Transactional
+    public int finalizeMonth(YearMonth month) {
+        log.info("[ANALYTICS-FINALIZE] نهایی‌سازی اسنپ‌شات‌های ماه {}", month);
+        List<SpendingSnapshot> snapshots = spendingSnapshotRepository.findAll().stream()
+                .filter(s -> month.equals(s.getSnapshotMonth()))
+                .collect(Collectors.toList());
+
+        for (SpendingSnapshot s : snapshots) {
+            s.calculateSavingsRate();
+            calculateComparedToPrevMonth(s);
+            spendingSnapshotRepository.save(s);
+        }
+        log.info("[ANALYTICS-FINALIZE] ✅ {} اسنپ‌شات برای ماه {} نهایی شد", snapshots.size(), month);
+        return snapshots.size();
     }
 
     @Transactional(readOnly = true)

@@ -80,12 +80,13 @@ public class LoanInstallment extends BaseEntity {
                 && !paidDate.isAfter(dueDate);
     }
 
-    // محاسبه جریمه دیرکرد (2% ماهانه)
+    // محاسبه جریمه دیرکرد (۲٪ ماهانه = نرخ روزانه × تعداد روز تأخیر)
     public BigDecimal calculateLateFee() {
         if (!isOverdue()) return BigDecimal.ZERO;
         long days = java.time.temporal.ChronoUnit.DAYS.between(dueDate, LocalDate.now());
-        double feeRate = 0.02 / 30; // نرخ روزانه
-        return amount.multiply(new BigDecimal(days * feeRate))
+        BigDecimal dailyRate = new BigDecimal("0.02")
+                .divide(new BigDecimal("30"), 10, java.math.RoundingMode.HALF_UP);
+        return amount.multiply(dailyRate).multiply(BigDecimal.valueOf(days))
                 .setScale(4, java.math.RoundingMode.HALF_UP);
     }
 }

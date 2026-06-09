@@ -7,6 +7,7 @@ import com.springbank.loan.dto.LoanResponseDto;
 import com.springbank.loan.dto.LoanUpdateDto;
 import com.springbank.loan.service.LoanReadService;
 import com.springbank.loan.service.LoanWriteService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,49 +26,49 @@ public class LoanController {
     private final LoanWriteService loanWriteService;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ResponseEntity<ApiResponse<List<LoanResponseDto>>> getAll() {
         return ResponseEntity.ok(ApiResponse.success("All loans", loanReadService.getAll(), "/api/loans"));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#loanReadService.getById(#id).userId(), authentication)")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER') or @securityUserService.isCurrentUser(@loanReadService.getById(#id).userId(), authentication)")
     public ResponseEntity<ApiResponse<LoanResponseDto>> getById(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Loan found", loanReadService.getById(id), "/api/loans/" + id));
     }
 
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#userId, authentication)")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER') or @securityUserService.isCurrentUser(#userId, authentication)")
     public ResponseEntity<ApiResponse<List<LoanResponseDto>>> getByUserId(@PathVariable Long userId) {
         return ResponseEntity.ok(ApiResponse.success("User loans", loanReadService.getByUserId(userId), "/api/loans/user/" + userId));
     }
 
     @GetMapping("/{id}/installments")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#loanReadService.getById(#id).userId(), authentication)")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER') or @securityUserService.isCurrentUser(@loanReadService.getById(#id).userId(), authentication)")
     public ResponseEntity<ApiResponse<List<LoanInstallmentDto>>> getInstallments(@PathVariable Long id) {
         return ResponseEntity.ok(ApiResponse.success("Loan installments", loanReadService.getInstallmentsByLoanId(id), "/api/loans/" + id + "/installments"));
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('CUSTOMER')")
-    public ResponseEntity<ApiResponse<LoanResponseDto>> create(@RequestBody LoanCreateDto dto) {
+    @PreAuthorize("hasRole('ADMIN') or (@securityUserService.isCurrentUser(#dto.userId(), authentication) and hasRole('CUSTOMER'))")
+    public ResponseEntity<ApiResponse<LoanResponseDto>> create(@Valid @RequestBody LoanCreateDto dto) {
         return ResponseEntity.ok(ApiResponse.success("Loan created", loanWriteService.createLoan(dto), "/api/loans"));
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<LoanResponseDto>> update(@PathVariable Long id, @RequestBody LoanUpdateDto dto) {
+    public ResponseEntity<ApiResponse<LoanResponseDto>> update(@PathVariable Long id, @Valid @RequestBody LoanUpdateDto dto) {
         return ResponseEntity.ok(ApiResponse.success("Loan updated", loanWriteService.updateLoan(id, dto), "/api/loans/" + id));
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ResponseEntity<ApiResponse<LoanResponseDto>> approve(@PathVariable Long id, @AuthenticationPrincipal UserDetails principal) {
         return ResponseEntity.ok(ApiResponse.success("Loan approved", loanWriteService.approveLoan(id, principal.getUsername()), "/api/loans/" + id + "/approve"));
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public ResponseEntity<ApiResponse<LoanResponseDto>> reject(@PathVariable Long id, @RequestParam String reason) {
         return ResponseEntity.ok(ApiResponse.success("Loan rejected", loanWriteService.rejectLoan(id, reason), "/api/loans/" + id + "/reject"));
     }
@@ -81,9 +82,8 @@ public class LoanController {
 
     @PostMapping("/installments/{installmentId}/pay")
     @PreAuthorize("hasRole('ADMIN') or hasRole('CUSTOMER')")
-    public ResponseEntity<ApiResponse<LoanInstallmentDto>> payInstallment(@PathVariable Long installmentId,
-                                                                          @RequestParam java.math.BigDecimal amount) {
-        LoanInstallmentDto dto = loanWriteService.payInstallment(installmentId, amount);
+    public ResponseEntity<ApiResponse<LoanInstallmentDto>> payInstallment(@PathVariable Long installmentId) {
+        LoanInstallmentDto dto = loanWriteService.payInstallment(installmentId);
         return ResponseEntity.ok(ApiResponse.success("Installment paid successfully", dto, "/api/loans/installments/" + installmentId + "/pay"));
     }
 }

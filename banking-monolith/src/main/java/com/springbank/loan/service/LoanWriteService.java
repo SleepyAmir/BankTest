@@ -1,16 +1,29 @@
 package com.springbank.loan.service;
 
+import com.springbank.account.entity.Account;
+import com.springbank.account.repository.AccountRepository;
 import com.springbank.common.annotation.Auditable;
+import com.springbank.common.enums.InstallmentStatus;
 import com.springbank.common.enums.LoanStatus;
+import com.springbank.common.enums.NotificationType;
+import com.springbank.common.enums.TransactionType;
+import com.springbank.common.event.TransactionCompletedEvent;
+import com.springbank.common.exception.BusinessException;
 import com.springbank.common.exception.ResourceNotFoundException;
 import com.springbank.loan.dto.LoanCreateDto;
+import com.springbank.loan.dto.LoanInstallmentDto;
 import com.springbank.loan.dto.LoanResponseDto;
 import com.springbank.loan.dto.LoanUpdateDto;
+import com.springbank.loan.entity.CreditScore;
 import com.springbank.loan.entity.Loan;
-import com.springbank.loan.mapper.LoanMapper;
-import com.springbank.loan.repository.LoanRepository;
-import com.springbank.loan.repository.LoanInstallmentRepository;
 import com.springbank.loan.entity.LoanInstallment;
+import com.springbank.loan.mapper.LoanMapper;
+import com.springbank.loan.repository.CreditScoreRepository;
+import com.springbank.loan.repository.LoanInstallmentRepository;
+import com.springbank.loan.repository.LoanRepository;
+import com.springbank.notification.service.NotificationService;
+import com.springbank.user.entity.User;
+import com.springbank.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -21,17 +34,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * ============================================================================
- * LOAN WRITE SERVICE
- * ============================================================================
- * Flow: Create Loan (PENDING) → Approve (ACTIVE + installments) → Reject
- * Events: LoanApprovedEvent published to RabbitMQ on approval
- *
- * LOG MARKERS: [LOAN-CREATE] [LOAN-UPDATE] [LOAN-APPROVE] [LOAN-REJECT] [LOAN-DELETE]
+ * LOAN WRITE SERVICE — درخواست، تأیید، واریز و بازپرداخت وام (فلوهای ۹ و ۱۰)
  * ============================================================================
  */
 @Slf4j
@@ -43,63 +53,79 @@ public class LoanWriteService {
     private final LoanRepository loanRepository;
     private final LoanInstallmentRepository installmentRepository;
     private final LoanMapper loanMapper;
-    private final LoanReadService loanReadService;
     private final CreditScoreService creditScoreService;
+    private final CreditScoreRepository creditScoreRepository;
+    private final AccountRepository accountRepository;
+    private final UserRepository userRepository;
+    private final NotificationService notificationService;
     private final RabbitTemplate rabbitTemplate;
 
     public static final String EXCHANGE = "banking.exchange";
+    public static final String ROUTING_TX_COMPLETED = "transaction.completed";
+
+    // ===================== فلوی ۹: درخواست وام =====================
 
     @Auditable(action = "CREATE_LOAN", entity = "Loan")
     public LoanResponseDto createLoan(LoanCreateDto dto) {
-        log.info("[LOAN-CREATE] Creating loan request: userId={}, amount={}, duration={} months",
+        log.info("[LOAN-CREATE] درخواست وام: userId={}, amount={}, duration={} ماه",
                 dto.userId(), dto.amount(), dto.durationMonths());
 
-        Loan loan = loanMapper.toEntity(dto);
-        loan.setStatus(LoanStatus.PENDING);
+        User user = userRepository.findActiveById(dto.userId())
+                .orElseThrow(() -> new ResourceNotFoundException("User", dto.userId()));
+        Account account = accountRepository.findActiveById(dto.accountId())
+                .orElseThrow(() -> new ResourceNotFoundException("Account", dto.accountId()));
 
-        BigDecimal interestRate = creditScoreService.getRecommendedInterestRate(dto.userId());
-        loan.setInterestRate(interestRate);
-        log.info("[LOAN-CREATE] Credit score based interest rate: {}%", interestRate);
+        // اعتبارسنجی: حداکثر مبلغ مجاز بر اساس امتیاز اعتباری (getLoanMultiplier)
+        BigDecimal maxAllowed = creditScoreService.getMaxAllowedLoanAmount(dto.userId());
+        if (dto.amount().compareTo(maxAllowed) > 0) {
+            throw new BusinessException(String.format(
+                    "مبلغ درخواستی (%s) از حداکثر مجاز بر اساس امتیاز اعتباری شما (%s) بیشتر است",
+                    dto.amount(), maxAllowed));
+        }
 
-        BigDecimal monthly = loan.calculateMonthlyInstallment();
-        loan.setMonthlyInstallment(monthly);
-        log.info("[LOAN-CREATE] Calculated monthly installment: {}", monthly);
+        Loan loan = Loan.builder()
+                .amount(dto.amount())
+                .durationMonths(dto.durationMonths())
+                .purpose(dto.purpose())
+                .status(LoanStatus.PENDING)
+                .user(user)
+                .account(account)
+                .build();
+
+        // نرخ سود پیشنهادی و قسط ماهانه بر اساس امتیاز اعتباری
+        loan.setInterestRate(creditScoreService.getRecommendedInterestRate(dto.userId()));
+        loan.setMonthlyInstallment(loan.calculateMonthlyInstallment());
+
+        // snapshot امتیاز اعتباری لحظه‌ی درخواست
+        creditScoreRepository.findByUserId(dto.userId()).ifPresent(loan::setCreditScore);
 
         Loan saved = loanRepository.save(loan);
-        log.info("[LOAN-CREATE] ✅ Loan created: id={}, status={}, monthlyInstallment={}",
-                saved.getId(), saved.getStatus(), saved.getMonthlyInstallment());
+        log.info("[LOAN-CREATE] ✅ وام ثبت شد: id={}, status=PENDING, نرخ={}%, قسط ماهانه={}",
+                saved.getId(), saved.getInterestRate(), saved.getMonthlyInstallment());
         return loanMapper.toDto(saved);
     }
 
     @Auditable(action = "UPDATE_LOAN", entity = "Loan")
     @CacheEvict(value = "loans", key = "#id")
     public LoanResponseDto updateLoan(Long id, LoanUpdateDto dto) {
-        log.info("[LOAN-UPDATE] Updating loan id={}", id);
         Loan loan = loanRepository.findActiveById(id)
-                .orElseThrow(() -> {
-                    log.error("[LOAN-UPDATE] ❌ Loan not found with id={}", id);
-                    return new ResourceNotFoundException("Loan", id);
-                });
+                .orElseThrow(() -> new ResourceNotFoundException("Loan", id));
         loanMapper.updateFromDto(dto, loan);
-        Loan saved = loanRepository.save(loan);
-        log.info("[LOAN-UPDATE] ✅ Loan id={} updated", saved.getId());
-        return loanMapper.toDto(saved);
+        return loanMapper.toDto(loanRepository.save(loan));
     }
+
+    // ===================== فلوی ۹: تأیید و واریز =====================
 
     @Auditable(action = "APPROVE_LOAN", entity = "Loan")
     @CacheEvict(value = "loans", key = "#id")
     public LoanResponseDto approveLoan(Long id, String approvedBy) {
-        log.info("[LOAN-APPROVE] ==================== APPROVING LOAN id={} by {} ====================", id, approvedBy);
+        log.info("[LOAN-APPROVE] تأیید وام id={} توسط {}", id, approvedBy);
 
         Loan loan = loanRepository.findActiveById(id)
-                .orElseThrow(() -> {
-                    log.error("[LOAN-APPROVE] ❌ Loan not found with id={}", id);
-                    return new ResourceNotFoundException("Loan", id);
-                });
+                .orElseThrow(() -> new ResourceNotFoundException("Loan", id));
 
         if (loan.getStatus() != LoanStatus.PENDING) {
-            log.error("[LOAN-APPROVE] ❌ Cannot approve loan. Current status={} (expected PENDING)", loan.getStatus());
-            throw new IllegalStateException("Loan must be in PENDING status to approve. Current: " + loan.getStatus());
+            throw new IllegalStateException("وام باید در وضعیت PENDING باشد. وضعیت فعلی: " + loan.getStatus());
         }
 
         loan.setStatus(LoanStatus.ACTIVE);
@@ -109,18 +135,182 @@ public class LoanWriteService {
         loan.setEndDate(LocalDate.now().plusMonths(loan.getDurationMonths()));
         loan.setRemainingAmount(loan.getAmount());
 
-        // Generate installment schedule
-        log.info("[LOAN-APPROVE] Generating {} monthly installments...", loan.getDurationMonths());
+        // تولید جدول اقساط
         List<LoanInstallment> installments = generateInstallments(loan);
         loan.setInstallments(installments);
         installmentRepository.saveAll(installments);
-        log.info("[LOAN-APPROVE] ✅ {} installments saved to database", installments.size());
+        log.info("[LOAN-APPROVE] ✅ {} قسط ساخته شد", installments.size());
+
+        // واریز مبلغ وام به حساب کاربر (اتمیک، در همین تراکنش)
+        Account account = accountRepository.findActiveById(loan.getAccount().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Account", loan.getAccount().getId()));
+        account.deposit(loan.getAmount());
+        accountRepository.save(account);
+        log.info("[LOAN-APPROVE] ✅ مبلغ {} به حساب id={} واریز شد. موجودی جدید={}",
+                loan.getAmount(), account.getId(), account.getBalance());
 
         Loan saved = loanRepository.save(loan);
-        log.info("[LOAN-APPROVE] ✅ Loan approved: id={}, startDate={}, endDate={}, monthlyInstallment={}",
-                saved.getId(), saved.getStartDate(), saved.getEndDate(), saved.getMonthlyInstallment());
 
-        // Publish event to RabbitMQ for notifications and other services
+        // رویداد تراکنش واریز وام (LOAN_DISBURSEMENT) برای میکروسرویس‌ها
+        publishTransaction(loan.getUser().getId(), null, account.getId(), loan.getAmount(),
+                TransactionType.LOAN_DISBURSEMENT, "loan");
+
+        // رویداد تأیید وام برای نوتیفیکیشن
+        publishLoanApproved(saved, approvedBy);
+
+        log.info("[LOAN-APPROVE] ✅ وام id={} تأیید و واریز شد", saved.getId());
+        return loanMapper.toDto(saved);
+    }
+
+    @Auditable(action = "REJECT_LOAN", entity = "Loan")
+    public LoanResponseDto rejectLoan(Long id, String reason) {
+        Loan loan = loanRepository.findActiveById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Loan", id));
+        loan.setStatus(LoanStatus.REJECTED);
+        loan.setRejectionReason(reason);
+        Loan saved = loanRepository.save(loan);
+        notificationService.notifyInApp(loan.getUser(), NotificationType.LOAN_REJECTED,
+                "درخواست وام رد شد", "درخواست وام شما رد شد. دلیل: " + reason, null);
+        log.info("[LOAN-REJECT] ✅ وام id={} رد شد", saved.getId());
+        return loanMapper.toDto(saved);
+    }
+
+    @Auditable(action = "DELETE_LOAN", entity = "Loan")
+    @CacheEvict(value = "loans", key = "#id")
+    public void deleteLoan(Long id) {
+        loanRepository.softDelete(id);
+    }
+
+    // ===================== فلوی ۱۰: بازپرداخت قسط =====================
+
+    @Auditable(action = "PAY_INSTALLMENT", entity = "LoanInstallment")
+    public LoanInstallmentDto payInstallment(Long installmentId) {
+        log.info("[LOAN-PAY] پرداخت قسط id={}", installmentId);
+
+        LoanInstallment inst = installmentRepository.findActiveById(installmentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Loan Installment", installmentId));
+
+        if (inst.getStatus() == InstallmentStatus.PAID) {
+            throw new IllegalStateException("این قسط قبلاً پرداخت شده است");
+        }
+
+        Loan loan = inst.getLoan();
+        Account account = accountRepository.findActiveById(loan.getAccount().getId())
+                .orElseThrow(() -> new ResourceNotFoundException("Account", loan.getAccount().getId()));
+
+        // محاسبه‌ی جریمه‌ی دیرکرد (۲٪ ماهانه) و روزهای تأخیر
+        LocalDate today = LocalDate.now();
+        boolean late = today.isAfter(inst.getDueDate());
+        BigDecimal lateFee = BigDecimal.ZERO;
+        int daysOverdue = 0;
+        if (late) {
+            daysOverdue = (int) ChronoUnit.DAYS.between(inst.getDueDate(), today);
+            BigDecimal dailyRate = new BigDecimal("0.02").divide(new BigDecimal("30"), 10, java.math.RoundingMode.HALF_UP);
+            lateFee = inst.getAmount().multiply(dailyRate).multiply(BigDecimal.valueOf(daysOverdue))
+                    .setScale(4, java.math.RoundingMode.HALF_UP);
+        }
+        inst.setLateFee(lateFee);
+        inst.setDaysOverdue(daysOverdue);
+
+        BigDecimal totalDue = inst.getAmount().add(lateFee);
+
+        // کسر اتمیک از حساب کاربر
+        if (account.getBalance().compareTo(totalDue) < 0) {
+            throw new BusinessException(String.format(
+                    "موجودی حساب کافی نیست. مبلغ قسط + جریمه: %s، موجودی: %s", totalDue, account.getBalance()));
+        }
+        account.withdraw(totalDue);
+        accountRepository.save(account);
+
+        // ثبت پرداخت
+        inst.setStatus(InstallmentStatus.PAID);
+        inst.setPaidDate(today);
+        inst.setPaidAmount(totalDue);
+
+        // کاهش مانده‌ی بدهی
+        loan.setRemainingAmount(loan.getRemainingAmount().subtract(inst.getAmount()));
+        if (loan.getRemainingAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            loan.setStatus(LoanStatus.COMPLETED);
+            loan.setRemainingAmount(BigDecimal.ZERO);
+            log.info("[LOAN-PAY] ✅ آخرین قسط وام id={} پرداخت شد → COMPLETED", loan.getId());
+        }
+
+        LoanInstallment savedInst = installmentRepository.save(inst);
+        loanRepository.save(loan);
+
+        // اثر بر امتیاز اعتباری (پرداخت به‌موقع مثبت، با تأخیر منفی)
+        creditScoreService.recordInstallmentPayment(loan.getUser().getId(), !late);
+
+        // رویداد تراکنش پرداخت قسط
+        publishTransaction(loan.getUser().getId(), account.getId(), null, totalDue,
+                TransactionType.LOAN_PAYMENT, "loan-installment");
+
+        // نوتیفیکیشن
+        String msg = late
+                ? String.format("قسط شماره %d با تأخیر %d روزه و جریمه‌ی %s پرداخت شد.",
+                inst.getInstallmentNumber(), daysOverdue, lateFee)
+                : String.format("قسط شماره %d با موفقیت و به‌موقع پرداخت شد.", inst.getInstallmentNumber());
+        notificationService.notifyInApp(loan.getUser(), NotificationType.TRANSACTION_DONE,
+                "پرداخت قسط", msg, null);
+
+        log.info("[LOAN-PAY] ✅ قسط id={} پرداخت شد (late={}, fee={}). مانده وام={}",
+                savedInst.getId(), late, lateFee, loan.getRemainingAmount());
+
+        return toInstallmentDto(savedInst);
+    }
+
+    // ===================== Helpers =====================
+
+    private List<LoanInstallment> generateInstallments(Loan loan) {
+        List<LoanInstallment> list = new ArrayList<>();
+        BigDecimal monthly = loan.getMonthlyInstallment();
+        BigDecimal monthlyRate = loan.getInterestRate()
+                .divide(new BigDecimal("100"), 10, java.math.RoundingMode.HALF_UP)
+                .divide(new BigDecimal("12"), 10, java.math.RoundingMode.HALF_UP);
+
+        BigDecimal remaining = loan.getAmount();
+        for (int i = 1; i <= loan.getDurationMonths(); i++) {
+            BigDecimal interestPart = remaining.multiply(monthlyRate).setScale(4, java.math.RoundingMode.HALF_UP);
+            BigDecimal principalPart = monthly.subtract(interestPart).setScale(4, java.math.RoundingMode.HALF_UP);
+            remaining = remaining.subtract(principalPart);
+
+            LoanInstallment inst = LoanInstallment.builder()
+                    .installmentNumber(i)
+                    .amount(monthly)
+                    .principalPart(principalPart)
+                    .interestPart(interestPart)
+                    .dueDate(loan.getStartDate().plusMonths(i))
+                    .status(InstallmentStatus.PENDING)
+                    .lateFee(BigDecimal.ZERO)
+                    .daysOverdue(0)
+                    .loan(loan)
+                    .build();
+            list.add(inst);
+        }
+        return list;
+    }
+
+    private void publishTransaction(Long userId, Long fromAccountId, Long toAccountId,
+                                    BigDecimal amount, TransactionType type, String category) {
+        try {
+            TransactionCompletedEvent event = TransactionCompletedEvent.builder()
+                    .trackingCode("TXN" + UUID.randomUUID().toString().replace("-", "").substring(0, 20).toUpperCase())
+                    .fromAccountId(fromAccountId)
+                    .toAccountId(toAccountId)
+                    .userId(userId)
+                    .amount(amount)
+                    .type(type.name())
+                    .status("COMPLETED")
+                    .spendingCategory(category)
+                    .timestamp(LocalDateTime.now())
+                    .build();
+            rabbitTemplate.convertAndSend(EXCHANGE, ROUTING_TX_COMPLETED, event);
+        } catch (Exception e) {
+            log.warn("[LOAN] ⚠️ انتشار رویداد تراکنش ناموفق بود: {}", e.getMessage());
+        }
+    }
+
+    private void publishLoanApproved(Loan saved, String approvedBy) {
         try {
             var event = com.springbank.common.event.LoanApprovedEvent.builder()
                     .loanId(saved.getId())
@@ -130,110 +320,25 @@ public class LoanWriteService {
                     .approvedBy(approvedBy)
                     .approvedAt(saved.getApprovedAt())
                     .build();
-            log.info("[LOAN-APPROVE] Publishing LoanApprovedEvent to RabbitMQ (userId={}, loanId={})...",
-                    event.getUserId(), event.getLoanId());
             rabbitTemplate.convertAndSend(EXCHANGE, "loan.approved", event);
-            log.info("[LOAN-APPROVE] ✅ LoanApprovedEvent published. Notification service will send notification to user.");
         } catch (Exception e) {
-            log.error("[LOAN-APPROVE] ❌ Failed to publish LoanApprovedEvent: {}. Loan approved but user won't get notification!", e.getMessage());
+            log.warn("[LOAN-APPROVE] ⚠️ انتشار LoanApprovedEvent ناموفق بود: {}", e.getMessage());
         }
-
-        log.info("[LOAN-APPROVE] ==================== LOAN APPROVED SUCCESSFULLY ====================\n");
-        return loanMapper.toDto(saved);
     }
 
-    @Auditable(action = "REJECT_LOAN", entity = "Loan")
-    public LoanResponseDto rejectLoan(Long id, String reason) {
-        log.info("[LOAN-REJECT] Rejecting loan id={}. Reason: {}", id, reason);
-        Loan loan = loanRepository.findActiveById(id)
-                .orElseThrow(() -> {
-                    log.error("[LOAN-REJECT] ❌ Loan not found with id={}", id);
-                    return new ResourceNotFoundException("Loan", id);
-                });
-        loan.setStatus(LoanStatus.REJECTED);
-        loan.setRejectionReason(reason);
-        Loan saved = loanRepository.save(loan);
-        log.info("[LOAN-REJECT] ✅ Loan id={} rejected. Reason: {}", saved.getId(), reason);
-        return loanMapper.toDto(saved);
-    }
-
-    @Auditable(action = "DELETE_LOAN", entity = "Loan")
-    @CacheEvict(value = "loans", key = "#id")
-    public void deleteLoan(Long id) {
-        log.info("[LOAN-DELETE] Soft-deleting loan id={}", id);
-        loanRepository.softDelete(id);
-        log.info("[LOAN-DELETE] ✅ Loan id={} soft-deleted", id);
-    }
-
-    @Auditable(action = "PAY_INSTALLMENT", entity = "LoanInstallment")
-    public com.springbank.loan.dto.LoanInstallmentDto payInstallment(Long installmentId, java.math.BigDecimal amount) {
-        log.info("[LOAN-PAY] Paying installment id={}, amount={}", installmentId, amount);
-
-        LoanInstallment inst = installmentRepository.findActiveById(installmentId)
-                .orElseThrow(() -> {
-                    log.error("[LOAN-PAY] ❌ Installment not found id={}", installmentId);
-                    return new ResourceNotFoundException("Loan Installment", installmentId);
-                });
-
-        if (inst.getStatus() == com.springbank.common.enums.InstallmentStatus.PAID) {
-            log.error("[LOAN-PAY] ❌ Installment already paid id={}", installmentId);
-            throw new IllegalStateException("Installment already paid");
-        }
-
-        if (amount.compareTo(inst.getAmount().add(inst.getLateFee())) < 0) {
-            log.error("[LOAN-PAY] ❌ Insufficient amount. Required={}, Sent={}", inst.getAmount().add(inst.getLateFee()), amount);
-            throw new IllegalArgumentException("Amount is less than required installment + late fee");
-        }
-
-        inst.setStatus(com.springbank.common.enums.InstallmentStatus.PAID);
-        inst.setPaidDate(java.time.LocalDate.now());
-        inst.setPaidAmount(amount);
-
-        Loan loan = inst.getLoan();
-        loan.setRemainingAmount(loan.getRemainingAmount().subtract(inst.getAmount()));
-        if (loan.getRemainingAmount().compareTo(java.math.BigDecimal.ZERO) <= 0) {
-            loan.setStatus(LoanStatus.COMPLETED);
-            log.info("[LOAN-PAY] Loan id={} fully repaid. Status changed to COMPLETED.", loan.getId());
-        }
-
-        LoanInstallment saved = installmentRepository.save(inst);
-        loanRepository.save(loan);
-        log.info("[LOAN-PAY] ✅ Installment id={} paid. Loan remaining={}", saved.getId(), loan.getRemainingAmount());
-
-        return new com.springbank.loan.dto.LoanInstallmentDto(
-                saved.getId(),
-                saved.getLoan().getId(),
-                saved.getInstallmentNumber(),
-                saved.getAmount(),
-                saved.getPrincipalPart(),
-                saved.getInterestPart(),
-                saved.getDueDate(),
-                saved.getPaidDate(),
-                saved.getStatus(),
-                saved.getLateFee(),
-                saved.getDaysOverdue()
+    private LoanInstallmentDto toInstallmentDto(LoanInstallment i) {
+        return new LoanInstallmentDto(
+                i.getId(),
+                i.getLoan() != null ? i.getLoan().getId() : null,
+                i.getInstallmentNumber(),
+                i.getAmount(),
+                i.getPrincipalPart(),
+                i.getInterestPart(),
+                i.getDueDate(),
+                i.getPaidDate(),
+                i.getStatus(),
+                i.getLateFee(),
+                i.getDaysOverdue()
         );
-    }
-
-    /**
-     * Generate monthly installment schedule using PMT formula
-     */
-    private List<LoanInstallment> generateInstallments(Loan loan) {
-        List<LoanInstallment> list = new ArrayList<>();
-        BigDecimal installmentAmount = loan.getMonthlyInstallment();
-        log.info("[LOAN-INSTALL] Each installment amount={} for {} months", installmentAmount, loan.getDurationMonths());
-
-        for (int i = 1; i <= loan.getDurationMonths(); i++) {
-            LoanInstallment inst = LoanInstallment.builder()
-                    .installmentNumber(i)
-                    .amount(installmentAmount)
-                    .dueDate(loan.getStartDate().plusMonths(i))
-                    .status(com.springbank.common.enums.InstallmentStatus.PENDING)
-                    .loan(loan)
-                    .build();
-            list.add(inst);
-            log.debug("[LOAN-INSTALL] Installment #{} dueDate={}", i, inst.getDueDate());
-        }
-        return list;
     }
 }
