@@ -31,6 +31,11 @@ public class JwtTokenProvider {
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
+    /** مدت اعتبار access token بر حسب میلی‌ثانیه (برای محاسبه‌ی expiresIn در پاسخ). */
+    public long getAccessTokenExpirationMs() {
+        return jwtExpiration;
+    }
+
     public String generateAccessToken(Authentication authentication) {
         UserDetails userDetails = (UserDetails) authentication.getPrincipal();
         return generateToken(userDetails, jwtExpiration);
