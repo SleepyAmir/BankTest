@@ -1,6 +1,15 @@
 package com.springbank.user.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
+/**
+ * درخواست ورود کاربر.
+ */
 public record LoginRequestDto(
-    String username,
-    String password
+
+        @NotBlank(message = "نام کاربری الزامی است")
+        String username,
+
+        @NotBlank(message = "رمز عبور الزامی است")
+        String password
 ) {}
