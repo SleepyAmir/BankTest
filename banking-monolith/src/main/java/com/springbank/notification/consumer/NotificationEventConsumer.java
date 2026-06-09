@@ -45,7 +45,7 @@ public class NotificationEventConsumer {
                     "Transaction Completed",
                     "Your transaction of " + event.getAmount() + " " + event.getType() + " has been completed.");
             if (notification != null) {
-                broadcastSse("TRANSACTION_DONE", "Transaction Completed", notification.getMessage());
+                pushSse(event.getUserId(), "TRANSACTION_DONE", "Transaction Completed", notification.getMessage());
             }
         } else {
             log.warn("[NOTIF-ERR] TransactionCompletedEvent has null userId — cannot send notification!");
@@ -60,7 +60,7 @@ public class NotificationEventConsumer {
                 "Loan Approved",
                 "Your loan application for " + event.getAmount() + " has been approved.");
         if (notification != null) {
-            broadcastSse("LOAN_APPROVED", "Loan Approved", notification.getMessage());
+            pushSse(event.getUserId(), "LOAN_APPROVED", "Loan Approved", notification.getMessage());
         }
     }
 
@@ -72,7 +72,7 @@ public class NotificationEventConsumer {
                 "Fraud Alert",
                 "A suspicious transaction has been detected on your account. Risk level: " + event.getRiskLevel());
         if (notification != null) {
-            broadcastSse("FRAUD_ALERT", "Fraud Alert", notification.getMessage());
+            pushSse(event.getUserId(), "FRAUD_ALERT", "Fraud Alert", notification.getMessage());
         }
     }
 
@@ -107,13 +107,22 @@ public class NotificationEventConsumer {
         }
     }
 
-    private void broadcastSse(String eventType, String title, String message) {
+    /**
+     * ارسال نوتیفیکیشن زنده فقط به کاربر مالک رویداد (per-user) از طریق SSE.
+     * <p>
+     * (پیش‌تر این متد به همه‌ی کاربران broadcast می‌کرد که باعث نشت نوتیفیکیشن می‌شد؛
+     * اکنون با {@code sendToUser} فقط برای صاحب رویداد ارسال می‌شود.)
+     */
+    private void pushSse(Long userId, String eventType, String title, String message) {
+        if (userId == null) {
+            return;
+        }
         try {
             String payload = String.format("{\"type\":\"%s\",\"title\":\"%s\",\"message\":\"%s\"}", eventType, title, message);
-            sseController.sendEvent(payload);
-            log.info("[NOTIF-SSE] ✅ SSE broadcast sent: type={}", eventType);
+            sseController.sendToUser(userId, payload);
+            log.info("[NOTIF-SSE] ✅ SSE sent to userId={}: type={}", userId, eventType);
         } catch (Exception e) {
-            log.error("[NOTIF-SSE] ❌ SSE broadcast failed: {}", e.getMessage());
+            log.error("[NOTIF-SSE] ❌ SSE push failed for userId={}: {}", userId, e.getMessage());
         }
     }
 }
