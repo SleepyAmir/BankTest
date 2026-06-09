@@ -1,5 +1,9 @@
 package com.springbank.user.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public record RefreshTokenRequestDto(
-    String refreshToken
+
+        @NotBlank(message = "refresh token الزامی است")
+        String refreshToken
 ) {}

@@ -51,6 +51,7 @@ public interface RoleRepository extends BaseEntityRepository<Role, Long> {
     long countActiveUsersByRoleId(@Param("roleId") Long roleId);
 
     // ========== Default Role ==========
-    @Query("SELECT r FROM roleEntity r WHERE r.name = 'ROLE_USER' AND r.deleted = false")
+    // نقش پیش‌فرض هنگام ثبت‌نام: CUSTOMER (که در Spring Security به ROLE_CUSTOMER تبدیل می‌شود).
+    @Query("SELECT r FROM roleEntity r WHERE r.name = 'CUSTOMER' AND r.deleted = false")
     Optional<Role> findDefaultUserRole();
 }
