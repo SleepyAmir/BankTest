@@ -45,6 +45,13 @@ public class TransactionReadService {
                 .collect(Collectors.toList());
     }
 
+    /** تراکنش‌های یک کاربر مشخص (برای پنل مشتری — فقط تراکنش‌های خودش). */
+    public List<TransactionResponseDto> getByUserId(Long userId) {
+        return transactionRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .map(transactionMapper::toDto)
+                .collect(Collectors.toList());
+    }
+
     @Cacheable(value = "transactions", key = "#trackingCode")
     public TransactionResponseDto getByTrackingCode(String trackingCode) {
         return transactionRepository.findByTrackingCode(trackingCode)

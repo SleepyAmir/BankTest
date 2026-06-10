@@ -1,5 +1,6 @@
 package com.springbank.card.service;
 
+import com.springbank.account.service.AccountReadService;
 import com.springbank.card.dto.CardResponseDto;
 import com.springbank.card.entity.Card;
 import com.springbank.card.mapper.CardMapper;
@@ -22,6 +23,12 @@ public class CardReadService {
 
     private final CardRepository cardRepository;
     private final CardMapper cardMapper;
+    private final AccountReadService accountReadService;
+
+    /** شناسه‌ی کاربر صاحب یک حساب (برای کنترل دسترسی به کارت‌های آن حساب). */
+    public Long getAccountOwnerUserId(Long accountId) {
+        return accountReadService.getById(accountId).userId();
+    }
 
     @Cacheable(value = "cards", key = "#id")
     public CardResponseDto getById(Long id) {

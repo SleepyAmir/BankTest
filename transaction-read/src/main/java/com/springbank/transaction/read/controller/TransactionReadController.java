@@ -31,6 +31,11 @@ public class TransactionReadController {
         return ResponseEntity.ok(ApiResponse.success("Card transactions", transactionReadService.getByCardId(cardId), "/api/transactions/card/" + cardId));
     }
 
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<ApiResponse<List<TransactionResponseDto>>> getByUser(@PathVariable Long userId) {
+        return ResponseEntity.ok(ApiResponse.success("User transactions", transactionReadService.getByUserId(userId), "/api/transactions/user/" + userId));
+    }
+
     @GetMapping("/recent")
     public ResponseEntity<ApiResponse<List<TransactionResponseDto>>> getRecent() {
         return ResponseEntity.ok(ApiResponse.success("Recent transactions", transactionReadService.getRecentTransactions(), "/api/transactions/recent"));

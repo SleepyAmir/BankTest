@@ -17,5 +17,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     @Query("SELECT t FROM Transaction t WHERE t.fromAccountId = :accountId OR t.toAccountId = :accountId ORDER BY t.createdAt DESC")
     List<Transaction> findByAccountId(@Param("accountId") Long accountId);
 
+    /** تراکنش‌های یک کاربر (که userId روی آن ثبت شده) — جدیدترین‌ها اول. */
+    List<Transaction> findByUserIdOrderByCreatedAtDesc(Long userId);
+
     List<Transaction> findByCardId(Long cardId);
 }
