@@ -192,6 +192,15 @@ public class UserService extends BaseEntityService<User, Long, UserResponseDto> 
     // ========== Role Management ==========
 
     @Transactional
+    public UserResponseDto toggleStatus(Long userId, boolean enabled) {
+        log.info("🔒 Toggling user status. userId: {}, enabled: {}", userId, enabled);
+        User user = findEntityById(userId);
+        user.setEnabled(enabled);
+        User updated = userRepository.save(user);
+        return userMapper.toResponseDto(updated);
+    }
+
+    @Transactional
     public UserResponseDto assignRolesToUser(@NonNull Long userId, @NonNull Set<Long> roleIds) {
         log.info("🔗 Assigning {} roles to user id: {}", roleIds.size(), userId);
 

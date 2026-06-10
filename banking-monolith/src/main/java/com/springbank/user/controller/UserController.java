@@ -59,6 +59,12 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.success("Roles assigned", userService.assignRolesToUser(id, roleIds), "/api/users/" + id + "/roles"));
     }
 
+    @PostMapping("/{id}/status")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<UserResponseDto>> toggleStatus(@PathVariable Long id, @RequestParam boolean enabled) {
+        return ResponseEntity.ok(ApiResponse.success("Status updated", userService.toggleStatus(id, enabled), "/api/users/" + id + "/status"));
+    }
+
     @PostMapping("/{id}/change-password")
     @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#id, authentication)")
     public ResponseEntity<ApiResponse<Void>> changePassword(@PathVariable Long id, @RequestBody ChangePasswordDto dto) {

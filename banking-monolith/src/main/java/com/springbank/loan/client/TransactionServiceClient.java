@@ -1,6 +1,7 @@
 package com.springbank.loan.client;
 
 import com.springbank.common.enums.TransactionType;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +36,7 @@ public class TransactionServiceClient {
      *
      * @return true اگر موفق بود.
      */
+    @CircuitBreaker(name = "transactionWriteService", fallbackMethod = "createTransactionFallback")
     public boolean createTransaction(TransactionType type, BigDecimal amount,
                                      Long fromAccountId, Long toAccountId,
                                      Long userId, String category, String description) {
@@ -48,13 +50,16 @@ public class TransactionServiceClient {
         body.put("toAccountId", toAccountId);
         body.put("spendingCategory", category);
         body.put("userId", userId);
-        try {
-            restTemplate.postForEntity(url, body, String.class);
-            log.info("[LOAN-TX] ✅ تراکنش {} از طریق transaction-write ثبت شد (amount={})", type, amount);
-            return true;
-        } catch (Exception e) {
-            log.error("[LOAN-TX] ❌ ثبت تراکنش {} ناموفق بود: {}", type, e.getMessage());
-            return false;
-        }
+        
+        restTemplate.postForEntity(url, body, String.class);
+        log.info("[LOAN-TX] ✅ تراکنش {} از طریق transaction-write ثبت شد (amount={})", type, amount);
+        return true;
+    }
+
+    public boolean createTransactionFallback(TransactionType type, BigDecimal amount,
+                                             Long fromAccountId, Long toAccountId,
+                                             Long userId, String category, String description, Exception e) {
+        log.error("[LOAN-TX] ⚠️ Circuit Breaker FALLBACK: ثبت تراکنش {} ناموفق بود. دلیل: {}", type, e.getMessage());
+        return false;
     }
 }
