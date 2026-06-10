@@ -7,6 +7,8 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
 
+import org.springframework.scheduling.annotation.EnableScheduling;
+
 /**
  * Transaction Read Service (CQRS Read Model)
  * Port: 8087 | DB: 5433 | Redis: 6379 | RabbitMQ Consumer: transaction.read.queue
@@ -15,6 +17,7 @@ import org.springframework.context.event.EventListener;
 @Slf4j
 @SpringBootApplication
 @EnableCaching
+@EnableScheduling
 public class TransactionReadApplication {
 
     public static void main(String[] args) {

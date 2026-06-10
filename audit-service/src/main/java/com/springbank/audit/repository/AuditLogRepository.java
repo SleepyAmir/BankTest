@@ -9,8 +9,10 @@ import org.springframework.stereotype.Repository;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+
 @Repository
-public interface AuditLogRepository extends JpaRepository<AuditLog, Long> {
+public interface AuditLogRepository extends JpaRepository<AuditLog, Long>, JpaSpecificationExecutor<AuditLog> {
     List<AuditLog> findByActorUsernameOrderByTimestampDesc(String actorUsername);
     List<AuditLog> findByEntityTypeAndEntityId(String entityType, Long entityId);
     List<AuditLog> findByAction(String action);

@@ -5,6 +5,7 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.event.ContextRefreshedEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 /**
  * Audit Log Service
@@ -12,7 +13,9 @@ import org.springframework.context.event.EventListener;
  * Flow: Receives AuditLogEvent → Persists to DB → Serves Query API
  */
 @Slf4j
+
 @SpringBootApplication
+@EnableScheduling
 public class AuditServiceApplication {
 
     public static void main(String[] args) {

@@ -9,12 +9,55 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import com.springbank.transaction.read.service.TransactionExportService;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.format.annotation.DateTimeFormat;
+import java.time.LocalDateTime;
+
 @RestController
 @RequestMapping("/api/transactions")
 @RequiredArgsConstructor
 public class TransactionReadController {
 
     private final TransactionReadService transactionReadService;
+    private final TransactionExportService transactionExportService;
+    private final com.springbank.transaction.read.mapper.TransactionMapper transactionMapper;
+
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<Page<TransactionResponseDto>>> search(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long accountId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end,
+            Pageable pageable) {
+        Page<TransactionResponseDto> page = transactionExportService.searchTransactions(userId, accountId, status, type, start, end, pageable)
+                .map(transactionMapper::toDto);
+        return ResponseEntity.ok(ApiResponse.success("Search results", page, "/api/transactions/search"));
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<InputStreamResource> exportExcel(
+            @RequestParam(required = false) Long userId,
+            @RequestParam(required = false) Long accountId,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime start,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime end) {
+
+        InputStreamResource file = new InputStreamResource(transactionExportService.exportToExcel(userId, accountId, status, type, start, end));
+        String filename = "Transactions_" + LocalDateTime.now() + ".xlsx";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(file);
+    }
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<TransactionResponseDto>> getById(@PathVariable Long id) {
