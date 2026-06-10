@@ -249,7 +249,7 @@ public class LoanWriteService {
         // نوتیفیکیشن
         String msg = late
                 ? String.format("قسط شماره %d با تأخیر %d روزه و جریمه‌ی %s پرداخت شد.",
-                inst.getInstallmentNumber(), daysOverdue, lateFee)
+                    inst.getInstallmentNumber(), daysOverdue, lateFee)
                 : String.format("قسط شماره %d با موفقیت و به‌موقع پرداخت شد.", inst.getInstallmentNumber());
         notificationService.notifyInApp(loan.getUser(), NotificationType.TRANSACTION_DONE,
                 "پرداخت قسط", msg, null);

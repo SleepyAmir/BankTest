@@ -3,7 +3,7 @@ package com.springbank.transaction.write.service;
 import com.springbank.common.enums.TransactionStatus;
 import com.springbank.common.enums.TransactionType;
 import com.springbank.common.exception.ResourceNotFoundException;
-import com.springbank.transaction.write.dto.response.TransactionResponseDto;
+import com.springbank.transaction.write.dto.TransactionResponseDto;
 import com.springbank.transaction.write.dto.request.TransactionCreateDto;
 import com.springbank.transaction.write.entity.Transaction;
 import com.springbank.transaction.write.mapper.TransactionMapper;
@@ -83,11 +83,14 @@ public class TransactionWriteService {
 
         } catch (Exception e) {
             // پول جابجا نشده (rollback سمت monolith)؛ تراکنش را FAILED ثبت می‌کنیم.
-            log.error("[TX-FAIL] ❌ جابجایی پول ناموفق بود: {}", e.getMessage());
+            String reason = e.getMessage() == null ? "unknown" : e.getMessage();
+            if (reason.length() > 180) reason = reason.substring(0, 180);
+            log.error("[TX-FAIL] ❌ جابجایی پول ناموفق بود: {}", reason);
             tx.setStatus(TransactionStatus.FAILED);
-            tx.setDescription((tx.getDescription() == null ? "" : tx.getDescription()) + " | Failed: " + e.getMessage());
+            // توضیح کوتاه و امن (ستون description حداکثر ۳۰۰ کاراکتر است)
+            tx.setDescription(("Failed: " + reason).substring(0, Math.min(290, ("Failed: " + reason).length())));
             transactionRepository.save(tx);
-            throw new IllegalStateException("تراکنش ناموفق بود: " + e.getMessage());
+            throw new IllegalStateException("تراکنش ناموفق بود: " + reason);
         }
     }
 

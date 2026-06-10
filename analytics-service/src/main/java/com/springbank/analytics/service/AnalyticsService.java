@@ -92,9 +92,9 @@ public class AnalyticsService {
     private boolean isIncome(TransactionCompletedEvent event) {
         return event.getType() != null && (
                 event.getType().equals("DEPOSIT") ||
-                        event.getType().equals("SALARY") ||
-                        event.getType().equals("REFUND") ||
-                        event.getType().equals("LOAN_DISBURSEMENT")
+                event.getType().equals("SALARY") ||
+                event.getType().equals("REFUND") ||
+                event.getType().equals("LOAN_DISBURSEMENT")
         );
     }
 

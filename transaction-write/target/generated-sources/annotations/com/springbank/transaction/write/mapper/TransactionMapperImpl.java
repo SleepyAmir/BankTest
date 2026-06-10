@@ -2,8 +2,8 @@ package com.springbank.transaction.write.mapper;
 
 import com.springbank.common.enums.TransactionStatus;
 import com.springbank.common.enums.TransactionType;
+import com.springbank.transaction.write.dto.TransactionResponseDto;
 import com.springbank.transaction.write.dto.request.TransactionCreateDto;
-import com.springbank.transaction.write.dto.response.TransactionResponseDto;
 import com.springbank.transaction.write.entity.Transaction;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-06-10T01:41:22+0330",
+    date = "2026-06-10T11:58:37+0330",
     comments = "version: 1.5.5.Final, compiler: javac, environment: Java 21.0.11 (Eclipse Adoptium)"
 )
 @Component

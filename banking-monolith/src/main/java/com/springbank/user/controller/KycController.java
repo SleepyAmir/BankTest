@@ -41,6 +41,22 @@ public class KycController {
 
     private final KycReadService kycReadService;
     private final KycWriteService kycWriteService;
+    private final com.springbank.common.storage.FileStorageService fileStorageService;
+
+    @Operation(summary = "نمایش فایل مدرک KYC (Manager/Admin) — national | selfie | address")
+    @GetMapping("/{id}/document/{docType}")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public ResponseEntity<org.springframework.core.io.Resource> getDocument(
+            @PathVariable Long id, @PathVariable String docType) {
+        String path = kycReadService.getDocumentPath(id, docType);
+        if (path == null) {
+            return ResponseEntity.notFound().build();
+        }
+        org.springframework.core.io.Resource resource = fileStorageService.loadAsResource(path);
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_TYPE, fileStorageService.contentType(path))
+                .body(resource);
+    }
 
     @Operation(summary = "دریافت KYC بر اساس userId")
     @GetMapping("/user/{userId}")
@@ -71,15 +87,17 @@ public class KycController {
 
     @Operation(summary = "ثبت KYC با مسیر مدارک از قبل آماده (JSON)")
     @PostMapping("/submit")
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#dto.userId(), authentication)")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<KycVerificationDto>> submit(@Valid @RequestBody KycSubmitDto dto) {
+        Long target = com.springbank.common.security.SecurityUtils.resolveTargetUserId(dto.userId());
+        dto = new KycSubmitDto(target, dto.requestedLevel(), dto.nationalIdImagePath(), dto.selfieImagePath(), dto.addressProofPath());
         KycVerificationDto result = kycWriteService.submitKyc(dto);
         return ResponseEntity.ok(ApiResponse.success("KYC submitted successfully", result, "/api/kyc/submit"));
     }
 
     @Operation(summary = "بارگذاری مدارک KYC (کارت ملی + سلفی) — multipart/form-data")
     @PostMapping(value = "/{userId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasRole('ADMIN') or @securityUserService.isCurrentUser(#userId, authentication)")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<KycVerificationDto>> uploadDocuments(
             @PathVariable Long userId,
             @RequestParam(value = "level", required = false) KycLevel level,
@@ -87,7 +105,8 @@ public class KycController {
             @RequestPart("selfie") MultipartFile selfie,
             @RequestPart(value = "addressProof", required = false) MultipartFile addressProof) {
         log.info("[KYC-API] POST /api/kyc/{}/documents", userId);
-        KycVerificationDto result = kycWriteService.uploadDocuments(userId, level, nationalId, selfie, addressProof);
+        Long target = com.springbank.common.security.SecurityUtils.resolveTargetUserId(userId);
+        KycVerificationDto result = kycWriteService.uploadDocuments(target, level, nationalId, selfie, addressProof);
         return ResponseEntity.ok(ApiResponse.success("مدارک با موفقیت بارگذاری شد", result,
                 "/api/kyc/" + userId + "/documents"));
     }

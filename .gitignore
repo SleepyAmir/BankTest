@@ -1,2 +1,30 @@
-# Project exclude paths
-/api-gateway/target/
+# ===== Build output =====
+target/
+build/
+*.jar
+*.war
+
+# ===== IDE =====
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+*.classpath
+*.project
+.settings/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== Logs & temp =====
+*.log
+logs/
+
+# ===== Uploaded KYC documents (local storage) =====
+uploads/
+
+# ===== Secrets (should never be committed) =====
+*.env
+.env

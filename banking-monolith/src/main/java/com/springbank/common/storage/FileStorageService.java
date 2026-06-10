@@ -122,4 +122,36 @@ public class FileStorageService {
         if (input == null) return "misc";
         return input.replaceAll("[^a-zA-Z0-9_-]", "_");
     }
+
+    /**
+     * بارگذاری یک فایل ذخیره‌شده به‌صورت Resource برای نمایش/دانلود.
+     * مسیر نسبی نسبت به دایرکتوری ریشه است (همان مقداری که store برگردانده).
+     */
+    public org.springframework.core.io.Resource loadAsResource(String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) {
+            throw new IllegalArgumentException("مسیر فایل نامعتبر است");
+        }
+        Path target = rootDir.resolve(relativePath).normalize();
+        if (!target.startsWith(rootDir)) {
+            throw new IllegalArgumentException("دسترسی به این مسیر مجاز نیست");
+        }
+        try {
+            org.springframework.core.io.Resource resource =
+                    new org.springframework.core.io.UrlResource(target.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new IllegalArgumentException("فایل یافت نشد");
+            }
+            return resource;
+        } catch (java.net.MalformedURLException e) {
+            throw new IllegalArgumentException("مسیر فایل نامعتبر است", e);
+        }
+    }
+
+    /** حدس نوع محتوا بر اساس پسوند. */
+    public String contentType(String relativePath) {
+        String p = relativePath.toLowerCase();
+        if (p.endsWith(".png")) return "image/png";
+        if (p.endsWith(".pdf")) return "application/pdf";
+        return "image/jpeg";
+    }
 }

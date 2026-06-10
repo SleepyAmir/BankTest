@@ -22,6 +22,18 @@ public class KycReadService {
     private final KycVerificationRepository kycRepository;
     private final KycMapper kycMapper;
 
+    /** مسیر نسبی فایل مدرک یک KYC بر اساس نوع ("national" | "selfie" | "address"). */
+    public String getDocumentPath(Long kycId, String docType) {
+        KycVerification kyc = kycRepository.findActiveById(kycId)
+                .orElseThrow(() -> new com.springbank.common.exception.ResourceNotFoundException("KYC Verification", kycId));
+        return switch (docType) {
+            case "national" -> kyc.getNationalIdImagePath();
+            case "selfie" -> kyc.getSelfieImagePath();
+            case "address" -> kyc.getAddressProofPath();
+            default -> null;
+        };
+    }
+
     public KycVerificationDto getById(Long id) {
         log.info("[KYC-READ] Fetching KYC id={}", id);
         KycVerification kyc = kycRepository.findActiveById(id)

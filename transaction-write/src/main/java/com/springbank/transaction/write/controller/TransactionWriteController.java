@@ -1,7 +1,7 @@
 package com.springbank.transaction.write.controller;
 
 import com.springbank.common.dto.ApiResponse;
-import com.springbank.transaction.write.dto.response.TransactionResponseDto;
+import com.springbank.transaction.write.dto.TransactionResponseDto;
 import com.springbank.transaction.write.dto.request.TransactionCreateDto;
 import com.springbank.transaction.write.service.TransactionWriteService;
 import jakarta.validation.Valid;

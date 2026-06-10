@@ -1,0 +1,116 @@
+# ============================================================================
+# docker-compose.dev-db.yml
+# ----------------------------------------------------------------------------
+# حالت توسعه: فقط زیرساخت (دیتابیس‌ها + Redis + RabbitMQ) با Docker بالا می‌آید
+# و سرویس‌های جاوا را از IntelliJ اجرا می‌کنید.
+#
+# پورت‌های host دقیقاً با چیزی که application.yml هر سرویس انتظار دارد هماهنگ شده‌اند:
+#   monolith     -> 5433
+#   transaction  -> 5438
+#   fraud        -> 5434
+#   analytics    -> 5435
+#   audit        -> 5436
+#   redis        -> 6379
+#   rabbitmq     -> 5672 / 15672
+#
+# اجرا:
+#   docker compose -f docker-compose.dev-db.yml up -d
+# توقف:
+#   docker compose -f docker-compose.dev-db.yml down
+# ریست کامل (پاک‌کردن دیتابیس‌ها):
+#   docker compose -f docker-compose.dev-db.yml down -v
+# ============================================================================
+services:
+  postgres-monolith:
+    image: postgres:16-alpine
+    container_name: dev-monolith-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: banking_monolith_db
+    ports:
+      - "5433:5432"          # application.yml مونولیت: localhost:5433
+    volumes:
+      - dev_monolith_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  postgres-transaction:
+    image: postgres:16-alpine
+    container_name: dev-transaction-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: banking_transaction_db
+    ports:
+      - "5438:5432"          # transaction-write/read: localhost:5438
+    volumes:
+      - dev_transaction_data:/var/lib/postgresql/data
+
+  postgres-fraud:
+    image: postgres:16-alpine
+    container_name: dev-fraud-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: banking_fraud_db
+    ports:
+      - "5434:5432"          # fraud-service: localhost:5434
+    volumes:
+      - dev_fraud_data:/var/lib/postgresql/data
+
+  postgres-analytics:
+    image: postgres:16-alpine
+    container_name: dev-analytics-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: banking_analytics_db
+    ports:
+      - "5435:5432"          # analytics-service: localhost:5435
+    volumes:
+      - dev_analytics_data:/var/lib/postgresql/data
+
+  postgres-audit:
+    image: postgres:16-alpine
+    container_name: dev-audit-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: banking_audit_db
+    ports:
+      - "5436:5432"          # audit-service: localhost:5436
+    volumes:
+      - dev_audit_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: dev-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - dev_redis_data:/data
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: dev-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"        # کنسول مدیریت: http://localhost:15672 (guest/guest)
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - dev_rabbitmq_data:/var/lib/rabbitmq
+
+volumes:
+  dev_monolith_data:
+  dev_transaction_data:
+  dev_fraud_data:
+  dev_audit_data:
+  dev_analytics_data:
+  dev_redis_data:
+  dev_rabbitmq_data:

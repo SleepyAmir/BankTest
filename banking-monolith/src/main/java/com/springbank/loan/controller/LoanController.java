@@ -50,9 +50,11 @@ public class LoanController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or (@securityUserService.isCurrentUser(#dto.userId(), authentication) and hasRole('CUSTOMER'))")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<LoanResponseDto>> create(@Valid @RequestBody LoanCreateDto dto) {
-        return ResponseEntity.ok(ApiResponse.success("Loan created", loanWriteService.createLoan(dto), "/api/loans"));
+        Long targetUserId = com.springbank.common.security.SecurityUtils.resolveTargetUserId(dto.userId());
+        LoanCreateDto resolved = new LoanCreateDto(dto.amount(), dto.durationMonths(), dto.purpose(), targetUserId, dto.accountId());
+        return ResponseEntity.ok(ApiResponse.success("Loan created", loanWriteService.createLoan(resolved), "/api/loans"));
     }
 
     @PutMapping("/{id}")

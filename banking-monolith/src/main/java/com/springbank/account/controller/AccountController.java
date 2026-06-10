@@ -51,9 +51,11 @@ public class AccountController {
     }
 
     @PostMapping("/open")
-    @PreAuthorize("hasAnyRole('ADMIN','MANAGER') or @securityUserService.isCurrentUser(#dto.userId(), authentication)")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<AccountWithCardDto>> open(@Valid @RequestBody OpenAccountDto dto) {
-        AccountWithCardDto result = accountWriteService.openAccount(dto);
+        Long targetUserId = com.springbank.common.security.SecurityUtils.resolveTargetUserId(dto.userId());
+        OpenAccountDto resolved = new OpenAccountDto(targetUserId, dto.type(), dto.branchCode(), dto.alias());
+        AccountWithCardDto result = accountWriteService.openAccount(resolved);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("حساب با موفقیت افتتاح و کارت صادر شد", result, "/api/accounts/open"));
     }
