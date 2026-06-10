@@ -10,7 +10,9 @@ import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import org.mapstruct.NullValuePropertyMappingStrategy;
 
-@Mapper(componentModel = "spring", nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
+@Mapper(componentModel = "spring",
+        nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE,
+        uses = { CardSecretMapper.class })
 public interface CardMapper {
 
     @Mapping(target = "account", expression = "java(mapAccount(dto.accountId()))")
@@ -18,6 +20,7 @@ public interface CardMapper {
 
     @Mapping(source = "account.id", target = "accountId")
     @Mapping(source = "account.user.id", target = "userId")
+    @Mapping(source = "cvv2", target = "cvv2", qualifiedByName = "decryptCvv")
     CardResponseDto toDto(Card card);
 
     void updateFromDto(CardUpdateDto dto, @MappingTarget Card card);

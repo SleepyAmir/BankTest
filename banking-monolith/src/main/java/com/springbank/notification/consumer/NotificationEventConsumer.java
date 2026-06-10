@@ -1,5 +1,6 @@
 package com.springbank.notification.consumer;
 
+import com.springbank.account.service.AccountReadService;
 import com.springbank.common.event.FraudDetectedEvent;
 import com.springbank.common.event.LoanApprovedEvent;
 import com.springbank.common.event.TransactionBlockedEvent;
@@ -36,20 +37,48 @@ public class NotificationEventConsumer {
     private final NotificationService notificationService;
     private final UserService userService;
     private final NotificationSseController sseController;
+    private final AccountReadService accountReadService;
 
     @RabbitHandler
     public void handleTransactionCompleted(TransactionCompletedEvent event) {
-        log.info("[NOTIF-RECV] Received TransactionCompletedEvent: txId={}, userId={}, amount={}",
-                event.getTransactionId(), event.getUserId(), event.getAmount());
+        log.info("[NOTIF-RECV] Received TransactionCompletedEvent: trackingCode={}, userId={}, amount={}, type={}",
+                event.getTrackingCode(), event.getUserId(), event.getAmount(), event.getType());
+
+        boolean isTransfer = "TRANSFER".equalsIgnoreCase(event.getType());
+
+        // ۱) نوتیفیکیشن برای فرستنده (صاحب رویداد)
         if (event.getUserId() != null) {
-            var notification = createNotification(event.getUserId(), NotificationType.TRANSACTION_DONE,
-                    "Transaction Completed",
-                    "Your transaction of " + event.getAmount() + " " + event.getType() + " has been completed.");
-            if (notification != null) {
-                pushSse(event.getUserId(), "TRANSACTION_DONE", "Transaction Completed", notification.getMessage());
+            String msg = isTransfer
+                    ? "مبلغ " + event.getAmount() + " از حساب شما منتقل شد."
+                    : "تراکنش " + event.getType() + " به مبلغ " + event.getAmount() + " انجام شد.";
+            notify(event.getUserId(), "تراکنش انجام شد", msg, "TRANSACTION_DONE");
+        }
+
+        // ۲) برای انتقال، نوتیفیکیشن برای گیرنده (صاحب حساب مقصد) نیز ساخته می‌شود
+        if (isTransfer && event.getToAccountId() != null) {
+            Long receiverUserId = resolveAccountOwner(event.getToAccountId());
+            if (receiverUserId != null && !receiverUserId.equals(event.getUserId())) {
+                notify(receiverUserId, "دریافت وجه",
+                        "مبلغ " + event.getAmount() + " به حساب شما واریز شد.", "TRANSACTION_DONE");
             }
-        } else {
-            log.warn("[NOTIF-ERR] TransactionCompletedEvent has null userId — cannot send notification!");
+        }
+    }
+
+    /** صاحب یک حساب را پیدا می‌کند (برای نوتیفیکیشن گیرنده). */
+    private Long resolveAccountOwner(Long accountId) {
+        try {
+            return accountReadService.getById(accountId).userId();
+        } catch (Exception e) {
+            log.warn("[NOTIF-ERR] نتوانست صاحب حساب {} را پیدا کند: {}", accountId, e.getMessage());
+            return null;
+        }
+    }
+
+    /** ساخت نوتیفیکیشن + push از طریق SSE برای یک کاربر. */
+    private void notify(Long userId, String title, String message, String sseType) {
+        var notification = createNotification(userId, NotificationType.TRANSACTION_DONE, title, message);
+        if (notification != null) {
+            pushSse(userId, sseType, title, message);
         }
     }
 

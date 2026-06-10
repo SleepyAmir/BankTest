@@ -44,6 +44,14 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponse.success("User accounts", accountReadService.getByUserId(userId), "/api/accounts/user/" + userId));
     }
 
+    /** یافتن حساب مقصد با شماره‌ی حساب (برای انتقال وجه). فقط اطلاعات حداقلی برمی‌گرداند. */
+    @GetMapping("/lookup")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<com.springbank.account.dto.AccountLookupDto>> lookup(@RequestParam String accountNumber) {
+        return ResponseEntity.ok(ApiResponse.success("Account found",
+                accountReadService.lookupByAccountNumber(accountNumber), "/api/accounts/lookup"));
+    }
+
     @PostMapping
     @PreAuthorize("hasRole('ADMIN') or hasRole('CUSTOMER_SERVICE')")
     public ResponseEntity<ApiResponse<AccountResponseDto>> create(@Valid @RequestBody AccountCreateDto dto) {

@@ -11,15 +11,19 @@ import com.springbank.user.entity.User;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import javax.annotation.processing.Generated;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-06-10T12:01:24+0330",
+    date = "2026-06-10T19:06:46+0330",
     comments = "version: 1.5.5.Final, compiler: javac, environment: Java 21.0.11 (Eclipse Adoptium)"
 )
 @Component
 public class CardMapperImpl implements CardMapper {
+
+    @Autowired
+    private CardSecretMapper cardSecretMapper;
 
     @Override
     public Card toEntity(CardCreateDto dto) {
@@ -51,6 +55,7 @@ public class CardMapperImpl implements CardMapper {
 
         Long accountId = null;
         Long userId = null;
+        String cvv2 = null;
         Long id = null;
         String cardNumber = null;
         CardType type = null;
@@ -63,6 +68,7 @@ public class CardMapperImpl implements CardMapper {
 
         accountId = cardAccountId( card );
         userId = cardAccountUserId( card );
+        cvv2 = cardSecretMapper.decryptCvv( card.getCvv2() );
         id = card.getId();
         cardNumber = card.getCardNumber();
         type = card.getType();
@@ -73,7 +79,7 @@ public class CardMapperImpl implements CardMapper {
         monthlyLimit = card.getMonthlyLimit();
         monthlySpent = card.getMonthlySpent();
 
-        CardResponseDto cardResponseDto = new CardResponseDto( id, cardNumber, type, status, expiryDate, isContactless, dailyLimit, monthlyLimit, monthlySpent, accountId, userId );
+        CardResponseDto cardResponseDto = new CardResponseDto( id, cardNumber, cvv2, type, status, expiryDate, isContactless, dailyLimit, monthlyLimit, monthlySpent, accountId, userId );
 
         return cardResponseDto;
     }

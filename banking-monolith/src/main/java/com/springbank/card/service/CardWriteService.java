@@ -32,6 +32,7 @@ public class CardWriteService {
     private final CardRepository cardRepository;
     private final CardMapper cardMapper;
     private final PasswordEncoder passwordEncoder;
+    private final com.springbank.common.security.EncryptionUtils encryptionUtils;
 
     /**
      * صدور خودکار کارت مجازی فعال برای یک حساب (فلوی ۳).
@@ -51,7 +52,7 @@ public class CardWriteService {
 
         Card card = Card.builder()
                 .cardNumber(cardNumber)
-                .cvv2(passwordEncoder.encode(rawCvv2))
+                .cvv2(encryptionUtils.encrypt(rawCvv2))
                 .pin(passwordEncoder.encode(rawPin))
                 .type(CardType.DEBIT)
                 .status(CardStatus.ACTIVE)
@@ -93,7 +94,7 @@ public class CardWriteService {
         }
         Card card = cardMapper.toEntity(dto);
         // Encrypt CVV2 and PIN
-        card.setCvv2(passwordEncoder.encode(dto.cvv2()));
+        card.setCvv2(encryptionUtils.encrypt(dto.cvv2()));
         if (dto.pin() != null) {
             card.setPin(passwordEncoder.encode(dto.pin()));
         }

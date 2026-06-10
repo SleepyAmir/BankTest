@@ -6,15 +6,16 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record CardResponseDto(
-    Long id,
-    String cardNumber,
-    CardType type,
-    CardStatus status,
-    LocalDate expiryDate,
-    Boolean isContactless,
-    BigDecimal dailyLimit,
-    BigDecimal monthlyLimit,
-    BigDecimal monthlySpent,
-    Long accountId,
-    Long userId
+        Long id,
+        String cardNumber,
+        String cvv2,          // متن آشکار (decrypt شده) — برای نمایش در کارت
+        CardType type,
+        CardStatus status,
+        LocalDate expiryDate,
+        Boolean isContactless,
+        BigDecimal dailyLimit,
+        BigDecimal monthlyLimit,
+        BigDecimal monthlySpent,
+        Long accountId,
+        Long userId
 ) {}
