@@ -14,5 +14,6 @@ public record InternalTransferDto(
         @NotNull Long fromAccountId,
         @NotNull Long toAccountId,
         @NotNull @DecimalMin("0.01") BigDecimal amount,
+        BigDecimal fee,
         boolean enforceLimits
 ) {}

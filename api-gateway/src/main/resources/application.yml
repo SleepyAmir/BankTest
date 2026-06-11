@@ -9,7 +9,7 @@ spring:
       enabled: true
   data:
     redis:
-      host: localhost
+      host: ${REDIS_HOST:localhost}
       port: 6379
   cloud:
     gateway:

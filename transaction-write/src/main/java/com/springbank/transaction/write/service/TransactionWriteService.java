@@ -108,7 +108,7 @@ public class TransactionWriteService {
 
         // برگشت: انتقال معکوس (اتمیک)
         if (tx.getType() == TransactionType.TRANSFER && tx.getFromAccountId() != null && tx.getToAccountId() != null) {
-            callTransfer(tx.getToAccountId(), tx.getFromAccountId(), tx.getAmount(), false);
+            callTransfer(tx.getToAccountId(), tx.getFromAccountId(), tx.getAmount(), tx.getFee(), false);
         } else if (tx.getFromAccountId() != null) {
             callDeposit(tx.getFromAccountId(), tx.getAmount()); // برگشت برداشت
         } else if (tx.getToAccountId() != null) {
@@ -141,14 +141,19 @@ public class TransactionWriteService {
     }
 
     private void moveMoneyAtomically(TransactionCreateDto dto) {
+        BigDecimal amountWithFee = dto.amount();
+        if (dto.fee() != null && dto.fee().compareTo(BigDecimal.ZERO) > 0) {
+            amountWithFee = amountWithFee.add(dto.fee());
+        }
+
         switch (dto.type()) {
             case TRANSFER -> {
                 requireAccounts(dto.fromAccountId(), dto.toAccountId());
-                callTransfer(dto.fromAccountId(), dto.toAccountId(), dto.amount(), true);
+                callTransfer(dto.fromAccountId(), dto.toAccountId(), dto.amount(), dto.fee(), true);
             }
             case WITHDRAWAL, CARD_PAYMENT -> {
                 requireAccount(dto.fromAccountId(), "حساب مبدأ");
-                callWithdraw(dto.fromAccountId(), dto.amount());
+                callWithdraw(dto.fromAccountId(), amountWithFee);
             }
             case DEPOSIT, REFUND, LOAN_DISBURSEMENT -> {
                 requireAccount(dto.toAccountId(), "حساب مقصد");
@@ -156,7 +161,7 @@ public class TransactionWriteService {
             }
             case LOAN_PAYMENT -> {
                 requireAccount(dto.fromAccountId(), "حساب مبدأ");
-                callWithdraw(dto.fromAccountId(), dto.amount());
+                callWithdraw(dto.fromAccountId(), amountWithFee);
             }
             default -> throw new IllegalArgumentException("نوع تراکنش پشتیبانی نمی‌شود: " + dto.type());
         }
@@ -172,12 +177,13 @@ public class TransactionWriteService {
     }
 
     /** فراخوانی انتقال اتمیک در monolith (یک تراکنش DB). */
-    private void callTransfer(Long fromId, Long toId, BigDecimal amount, boolean enforceLimits) {
+    private void callTransfer(Long fromId, Long toId, BigDecimal amount, BigDecimal fee, boolean enforceLimits) {
         String url = monolithBaseUrl + "/internal/accounts/transfer";
         Map<String, Object> body = new HashMap<>();
         body.put("fromAccountId", fromId);
         body.put("toAccountId", toId);
         body.put("amount", amount);
+        body.put("fee", fee != null ? fee : BigDecimal.ZERO);
         body.put("enforceLimits", enforceLimits);
         restTemplate.postForEntity(url, body, String.class);
         log.info("[TX-MOVE] ✅ انتقال اتمیک monolith موفق ({} → {})", fromId, toId);

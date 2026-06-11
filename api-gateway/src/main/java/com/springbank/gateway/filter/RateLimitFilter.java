@@ -41,13 +41,17 @@ public class RateLimitFilter implements GlobalFilter, Ordered {
                         return exchange.getResponse().setComplete();
                     }
                     return chain.filter(exchange);
+                })
+                .onErrorResume(e -> {
+                    log.error("Redis error in RateLimitFilter: {}", e.getMessage());
+                    // Fallback: If Redis is down, allow the request to pass through
+                    return chain.filter(exchange);
                 });
     }
 
     private String getClientId(ServerWebExchange exchange) {
         String authHeader = exchange.getRequest().getHeaders().getFirst("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            // Extract username from JWT or use token hash
             return authHeader.substring(7);
         }
         return exchange.getRequest().getRemoteAddress() != null

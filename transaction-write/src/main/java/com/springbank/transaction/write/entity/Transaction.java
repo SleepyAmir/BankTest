@@ -58,6 +58,9 @@ public class Transaction extends BaseEntity {
     @Column(length = 100)
     private String location;
 
+    @Column(precision = 19, scale = 4)
+    private BigDecimal fee;
+
     // ======== CROSS-SERVICE IDs (no JPA relations to other services) ========
 
     @Column(name = "from_account_id")

@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-06-11T02:04:57+0330",
+    date = "2026-06-11T20:36:12+0330",
     comments = "version: 1.5.5.Final, compiler: javac, environment: Java 21.0.11 (Eclipse Adoptium)"
 )
 @Component
@@ -34,6 +34,7 @@ public class TransactionMapperImpl implements TransactionMapper {
         transaction.ipAddress( dto.ipAddress() );
         transaction.deviceFingerprint( dto.deviceFingerprint() );
         transaction.location( dto.location() );
+        transaction.fee( dto.fee() );
         transaction.fromAccountId( dto.fromAccountId() );
         transaction.toAccountId( dto.toAccountId() );
         transaction.cardId( dto.cardId() );

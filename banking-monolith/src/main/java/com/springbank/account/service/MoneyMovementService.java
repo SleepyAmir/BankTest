@@ -48,30 +48,34 @@ public class MoneyMovementService {
             throw new BusinessException("حساب مبدأ و مقصد نمی‌توانند یکسان باشند");
         }
 
+        BigDecimal fee = dto.fee() != null ? dto.fee() : BigDecimal.ZERO;
+        BigDecimal totalDeduction = dto.amount().add(fee);
+
         Account from = loadActiveAccount(dto.fromAccountId());
         Account to = loadActiveAccount(dto.toAccountId());
 
         if (!from.isActive()) throw new BusinessException("حساب مبدأ فعال نیست");
         if (!to.isActive()) throw new BusinessException("حساب مقصد فعال نیست");
-        if (from.getBalance().compareTo(dto.amount()) < 0) {
-            throw new BusinessException("موجودی حساب مبدأ کافی نیست");
+        if (from.getBalance().compareTo(totalDeduction) < 0) {
+            throw new BusinessException("موجودی حساب مبدأ کافی نیست (با احتساب کارمزد)");
         }
 
         if (dto.enforceLimits()) {
             from.resetTransferCountersIfNeeded();
             BigDecimal effDaily = effectiveDailyLimit(from);
             BigDecimal effMonthly = effectiveMonthlyLimit(from);
-            if (!from.isWithinDailyLimit(dto.amount(), effDaily)) {
+            if (!from.isWithinDailyLimit(totalDeduction, effDaily)) {
                 throw new BusinessException("سقف انتقال روزانه رعایت نشده است. سقف: " + effDaily);
             }
-            if (!from.isWithinMonthlyLimit(dto.amount(), effMonthly)) {
+            if (!from.isWithinMonthlyLimit(totalDeduction, effMonthly)) {
                 throw new BusinessException("سقف انتقال ماهانه رعایت نشده است. سقف: " + effMonthly);
             }
         }
 
-        from.withdraw(dto.amount());
+        from.withdraw(totalDeduction);
         to.deposit(dto.amount());
-        from.registerOutgoingTransfer(dto.amount());
+        from.registerOutgoingTransfer(totalDeduction);
+
         accountRepository.save(from);
         accountRepository.save(to);
 

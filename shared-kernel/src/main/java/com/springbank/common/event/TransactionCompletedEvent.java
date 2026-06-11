@@ -15,6 +15,7 @@ public class TransactionCompletedEvent {
     private Long cardId;
     private Long userId;
     private BigDecimal amount;
+    private BigDecimal fee;
     private String type;
     private String status;
     private String spendingCategory;

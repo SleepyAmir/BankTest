@@ -12,6 +12,8 @@ public record TransactionCreateDto(
         @DecimalMin(value = "0.01", message = "مبلغ باید بزرگ‌تر از صفر باشد")
         BigDecimal amount,
 
+        BigDecimal fee,
+
         String currency,
 
         @NotNull(message = "نوع تراکنش الزامی است")
