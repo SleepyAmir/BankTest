@@ -10,7 +10,7 @@
 #   fraud        -> 5434
 #   analytics    -> 5435
 #   audit        -> 5436
-#   redis        -> 6379
+#   redis        -> 6380 (روی هاست) -> 6379 (داخل کانتینر)
 #   rabbitmq     -> 5672 / 15672
 #
 # اجرا:
@@ -90,9 +90,9 @@ services:
     image: redis:7-alpine
     container_name: dev-redis
     ports:
-      - "6379:6379"
+       - "16379:6379"
     volumes:
-      - dev_redis_data:/data
+       - dev_redis_data:/data
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
