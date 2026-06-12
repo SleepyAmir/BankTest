@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-06-11T21:09:03+0330",
+    date = "2026-06-11T22:56:01+0330",
     comments = "version: 1.5.5.Final, compiler: javac, environment: Java 21.0.11 (Eclipse Adoptium)"
 )
 @Component
@@ -31,6 +31,10 @@ public class KycMapperImpl implements KycMapper {
         Long id = null;
         KycStatus status = null;
         KycLevel level = null;
+        String nationalCode = null;
+        String birthDate = null;
+        String address = null;
+        String postalCode = null;
         String nationalIdImagePath = null;
         String selfieImagePath = null;
         String addressProofPath = null;
@@ -45,6 +49,10 @@ public class KycMapperImpl implements KycMapper {
         id = entity.getId();
         status = entity.getStatus();
         level = entity.getLevel();
+        nationalCode = entity.getNationalCode();
+        birthDate = entity.getBirthDate();
+        address = entity.getAddress();
+        postalCode = entity.getPostalCode();
         nationalIdImagePath = entity.getNationalIdImagePath();
         selfieImagePath = entity.getSelfieImagePath();
         addressProofPath = entity.getAddressProofPath();
@@ -52,7 +60,7 @@ public class KycMapperImpl implements KycMapper {
         verifiedBy = entity.getVerifiedBy();
         verifiedAt = entity.getVerifiedAt();
 
-        KycVerificationDto kycVerificationDto = new KycVerificationDto( id, userId, username, status, level, nationalIdImagePath, selfieImagePath, addressProofPath, rejectionReason, verifiedBy, verifiedAt, dailyTransferLimit, monthlyTransferLimit );
+        KycVerificationDto kycVerificationDto = new KycVerificationDto( id, userId, username, status, level, nationalCode, birthDate, address, postalCode, nationalIdImagePath, selfieImagePath, addressProofPath, rejectionReason, verifiedBy, verifiedAt, dailyTransferLimit, monthlyTransferLimit );
 
         return kycVerificationDto;
     }

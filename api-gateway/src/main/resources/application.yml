@@ -7,10 +7,10 @@ spring:
   threads:
     virtual:
       enabled: true
-    data:
-     redis:
-        host: ${REDIS_HOST:localhost}
-        port: ${REDIS_PORT:16379}
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: 6379
   cloud:
     gateway:
       globalcors:
@@ -69,3 +69,7 @@ spring:
             - Path=/internal/**
           filters:
             - SetStatus=403
+
+app:
+  jwt:
+    secret: thisIsAVeryLongSecretKeyForJWTTokenGenerationThatMustBeAtLeast512BitsLongForHS512Algorithm1234567890

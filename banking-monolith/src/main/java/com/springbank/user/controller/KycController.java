@@ -90,24 +90,31 @@ public class KycController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<KycVerificationDto>> submit(@Valid @RequestBody KycSubmitDto dto) {
         Long target = com.springbank.common.security.SecurityUtils.resolveTargetUserId(dto.userId());
-        dto = new KycSubmitDto(target, dto.requestedLevel(), dto.nationalIdImagePath(), dto.selfieImagePath(), dto.addressProofPath());
+        dto = new KycSubmitDto(target, dto.requestedLevel(), dto.nationalCode(), dto.birthDate(), dto.address(), dto.postalCode(), dto.nationalIdImagePath(), dto.selfieImagePath(), dto.addressProofPath());
         KycVerificationDto result = kycWriteService.submitKyc(dto);
         return ResponseEntity.ok(ApiResponse.success("KYC submitted successfully", result, "/api/kyc/submit"));
     }
 
-    @Operation(summary = "بارگذاری مدارک KYC (کارت ملی + سلفی) — multipart/form-data")
+    @Operation(summary = "بارگذاری مدارک و اطلاعات KYC — multipart/form-data")
     @PostMapping(value = "/{userId}/documents", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<KycVerificationDto>> uploadDocuments(
             @PathVariable Long userId,
             @RequestParam(value = "level", required = false) KycLevel level,
+            @RequestParam(value = "nationalCode", required = false) String nationalCode,
+            @RequestParam(value = "birthDate", required = false) String birthDate,
+            @RequestParam(value = "address", required = false) String address,
+            @RequestParam(value = "postalCode", required = false) String postalCode,
             @RequestPart("nationalId") MultipartFile nationalId,
             @RequestPart("selfie") MultipartFile selfie,
             @RequestPart(value = "addressProof", required = false) MultipartFile addressProof) {
         log.info("[KYC-API] POST /api/kyc/{}/documents", userId);
         Long target = com.springbank.common.security.SecurityUtils.resolveTargetUserId(userId);
-        KycVerificationDto result = kycWriteService.uploadDocuments(target, level, nationalId, selfie, addressProof);
-        return ResponseEntity.ok(ApiResponse.success("مدارک با موفقیت بارگذاری شد", result,
+
+        KycSubmitDto dto = new KycSubmitDto(target, level, nationalCode, birthDate, address, postalCode, null, null, null);
+        KycVerificationDto result = kycWriteService.uploadDocuments(target, dto, nationalId, selfie, addressProof);
+
+        return ResponseEntity.ok(ApiResponse.success("مدارک و اطلاعات با موفقیت بارگذاری شد", result,
                 "/api/kyc/" + userId + "/documents"));
     }
 

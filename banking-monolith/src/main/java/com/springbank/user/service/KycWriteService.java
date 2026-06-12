@@ -60,17 +60,17 @@ public class KycWriteService {
     }
 
     /**
-     * بارگذاری واقعی مدارک KYC (تصویر کارت ملی و سلفی الزامی، مدرک آدرس اختیاری).
+     * بارگذاری واقعی مدارک و اطلاعات KYC (تصویر کارت ملی و سلفی الزامی، اطلاعات هویتی).
      * پس از ذخیره‌ی فایل‌ها، وضعیت به {@code DOCUMENT_UPLOADED} می‌رود.
      *
      * @param userId       شناسه‌ی کاربر
-     * @param requestedLevel سطح درخواستی (اختیاری)
+     * @param dto          اطلاعات هویتی و سطح درخواستی
      * @param nationalId   تصویر کارت ملی (الزامی)
      * @param selfie       عکس سلفی (الزامی)
      * @param addressProof مدرک آدرس (اختیاری)
      */
     public KycVerificationDto uploadDocuments(Long userId,
-                                              KycLevel requestedLevel,
+                                              KycSubmitDto dto,
                                               MultipartFile nationalId,
                                               MultipartFile selfie,
                                               MultipartFile addressProof) {
@@ -84,7 +84,13 @@ public class KycWriteService {
             throw new BusinessException("عکس سلفی الزامی است");
         }
 
-        KycVerification kyc = getOrCreate(user, requestedLevel);
+        KycVerification kyc = getOrCreate(user, dto.requestedLevel());
+
+        // تنظیم فیلدهای جدید
+        if (dto.nationalCode() != null) kyc.setNationalCode(dto.nationalCode());
+        if (dto.birthDate() != null) kyc.setBirthDate(dto.birthDate());
+        if (dto.address() != null) kyc.setAddress(dto.address());
+        if (dto.postalCode() != null) kyc.setPostalCode(dto.postalCode());
 
         String folder = "user-" + user.getId();
         kyc.setNationalIdImagePath(fileStorageService.store(nationalId, folder, "national-id"));

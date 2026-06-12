@@ -43,6 +43,20 @@ public class KycVerification extends BaseEntity {
     @Column(name = "selfie_image_path")
     private String selfieImagePath;
 
+    // ======== فیلدهای اطلاعات هویتی جدید ========
+    @Column(name = "national_code", length = 10)
+    private String nationalCode;
+
+    @Column(name = "birth_date", length = 20)
+    private String birthDate;
+
+    @Column(name = "address", length = 500)
+    private String address;
+
+    @Column(name = "postal_code", length = 20)
+    private String postalCode;
+    // ============================================
+
     // مسیر مدرک آدرس
     @Column(name = "address_proof_path")
     private String addressProofPath;
